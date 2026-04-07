@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-GB" data-theme="dark" data-lang="en">
+<html lang="en-GB" data-theme="light" data-lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,26 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
-    /* ── DARK THEME (default) ── */
+    /* ── LIGHT THEME (default) ── */
     :root {
-      --bg:       #040608;
-      --surface:  #080c10;
-      --surface2: #0d1318;
-      --border:   #1a2430;
-      --border2:  #243040;
-      --accent:   #39ff14;
-      --accent2:  #ffb300;
-      --accent3:  #00e5ff;
-      --text:     #d4dce4;
-      --muted:    #7a9ab0;
-      --mono:     'Space Mono', monospace;
-      --sans:     'Barlow Semi Condensed', sans-serif;
-      --body:     'Barlow', sans-serif;
-      --transition: 0.25s ease;
-    }
-
-    /* ── LIGHT THEME ── */
-    [data-theme="light"] {
       --bg:       #f0f2f5;
       --surface:  #ffffff;
       --surface2: #e8ecf1;
@@ -39,329 +21,239 @@
       --accent3:  #007a8a;
       --text:     #1e2d3d;
       --muted:    #4a6070;
+      --mono:     'Space Mono', monospace;
+      --sans:     'Barlow Semi Condensed', sans-serif;
+      --body:     'Barlow', sans-serif;
+      --transition: 0.25s ease;
+    }
+    /* ── DARK THEME ── */
+    [data-theme="dark"] {
+      --bg:       #040608;
+      --surface:  #080c10;
+      --surface2: #0d1318;
+      --border:   #1a2430;
+      --border2:  #243040;
+      --accent:   #39ff14;
+      --accent2:  #ffb300;
+      --accent3:  #00e5ff;
+      --text:     #d4dce4;
+      --muted:    #7a9ab0;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--body);
-      font-size: 16px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: var(--body); font-size: 16px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
       transition: background var(--transition), color var(--transition);
     }
-
     body::before {
-      content: '';
-      position: fixed; inset: 0;
+      content: ''; position: fixed; inset: 0;
       background-image:
-        linear-gradient(rgba(57,255,20,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(57,255,20,0.025) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none; z-index: 0;
-      transition: opacity var(--transition);
-    }
-    [data-theme="light"] body::before {
-      background-image:
-        linear-gradient(rgba(0,98,168,0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,98,168,0.05) 1px, transparent 1px);
+        linear-gradient(color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none; z-index: 0;
     }
 
     .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; position: relative; z-index: 1; }
 
-    /* ── TAGS ── */
     .tag {
-      display: inline-block;
-      font-family: var(--mono);
+      display: inline-block; font-family: var(--mono);
       font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--accent);
-      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
       padding: 3px 10px; border-radius: 2px;
     }
     .tag.amber { color: var(--accent2); border-color: color-mix(in srgb, var(--accent2) 35%, transparent); }
     .tag.cyan  { color: var(--accent3); border-color: color-mix(in srgb, var(--accent3) 35%, transparent); }
 
-    /* ═══════════════════════════════
-       TOP BAR
-    ═══════════════════════════════ */
+    /* ── TOP BAR ── */
     .topbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       background: color-mix(in srgb, var(--bg) 92%, transparent);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      height: 54px; display: flex; align-items: center;
+      border-bottom: 1px solid var(--border); height: 54px;
+      display: flex; align-items: center;
       transition: background var(--transition), border-color var(--transition);
     }
     .topbar .inner { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 1rem; }
+
+    /* Logo */
     .topbar-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
-    .topbar-logo .logo-icon {
-      width: 28px; height: 28px;
-      border: 1.5px solid var(--accent); border-radius: 3px;
+    .logo-mark {
+      width: 32px; height: 32px; flex-shrink: 0;
+      /* The icon has a black bg – we show it as-is in dark mode,
+         and add a subtle dark circle bg in light mode so it reads well */
+      border-radius: 4px;
+      background: #000;
       display: flex; align-items: center; justify-content: center;
-      transition: border-color var(--transition);
+      overflow: hidden;
     }
-    .logo-icon svg { width: 16px; height: 16px; }
+    .logo-mark svg { width: 28px; height: 28px; }
     .topbar-logo .wordmark {
       font-family: var(--sans); font-size: 15px; font-weight: 700;
       letter-spacing: 0.06em; color: var(--text); text-transform: uppercase;
       transition: color var(--transition);
     }
     .topbar-logo .wordmark span { color: var(--accent); transition: color var(--transition); }
+
     .topbar-nav { display: flex; align-items: center; gap: 1.5rem; }
     .topbar-nav a {
       font-family: var(--sans); font-size: 13px; font-weight: 500;
       letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--muted); text-decoration: none;
-      transition: color 0.2s;
+      color: var(--muted); text-decoration: none; transition: color 0.2s;
     }
     .topbar-nav a:hover { color: var(--text); }
 
-    /* Nav controls (flags + theme + download) */
     .nav-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-
-    /* Icon button base */
     .icon-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px;
-      background: none;
-      border: 1px solid var(--border2);
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 16px; line-height: 1;
-      color: var(--muted);
-      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      width: 32px; height: 32px; background: none;
+      border: 1px solid var(--border2); border-radius: 3px;
+      cursor: pointer; font-size: 16px; line-height: 1; color: var(--muted);
+      transition: border-color 0.2s, color 0.2s;
     }
     .icon-btn:hover { border-color: var(--accent); color: var(--text); }
-    .icon-btn.active { border-color: var(--accent); color: var(--accent); }
+    .theme-icon-light { display: block; }
+    .theme-icon-dark  { display: none; }
+    [data-theme="dark"] .theme-icon-light { display: none; }
+    [data-theme="dark"] .theme-icon-dark  { display: block; }
 
-    /* Theme toggle icon */
-    .theme-icon-dark  { display: block; }
-    .theme-icon-light { display: none; }
-    [data-theme="light"] .theme-icon-dark  { display: none; }
-    [data-theme="light"] .theme-icon-light { display: block; }
-
-    /* Download button in nav */
     .btn-nav {
       font-family: var(--sans); font-size: 12px; font-weight: 600;
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--bg) !important; background: var(--accent);
       padding: 7px 18px; border-radius: 2px; border: none;
-      text-decoration: none; cursor: pointer;
-      transition: opacity 0.2s, background var(--transition), color var(--transition);
+      text-decoration: none; cursor: pointer; transition: opacity 0.2s, background var(--transition), color var(--transition);
     }
     .btn-nav:hover { opacity: 0.85; }
 
-    /* ═══════════════════════════════
-       HERO
-    ═══════════════════════════════ */
+    /* ── HERO ── */
     .hero { padding: 140px 0 100px; }
     .hero-badge { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 2rem; }
-    .badge-dot {
-      width: 6px; height: 6px; background: var(--accent); border-radius: 50%;
-      animation: pulse 2s ease-in-out infinite;
-      transition: background var(--transition);
-    }
+    .badge-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse {
       0%,100% { opacity:1; box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 40%,transparent); }
       50%      { opacity:.7; box-shadow:0 0 0 6px transparent; }
     }
-    .badge-text {
-      font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--accent);
-      transition: color var(--transition);
-    }
-    .hero-headline {
-      font-family: var(--sans);
-      font-size: clamp(40px, 6vw, 72px); font-weight: 700;
-      line-height: 1.0; letter-spacing: -0.01em; text-transform: uppercase;
-      color: var(--text); margin-bottom: 1.5rem;
-      transition: color var(--transition);
-    }
+    .badge-text { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+    .hero-headline { font-family: var(--sans); font-size: clamp(40px,6vw,72px); font-weight: 700; line-height: 1.0; letter-spacing: -0.01em; text-transform: uppercase; color: var(--text); margin-bottom: 1.5rem; transition: color var(--transition); }
     .hero-headline .line2 { color: var(--accent); display: block; transition: color var(--transition); }
-    .hero-sub {
-      font-size: 18px; font-weight: 300; color: var(--muted);
-      max-width: 560px; margin-bottom: 2.5rem; line-height: 1.7;
-      transition: color var(--transition);
-    }
+    .hero-sub { font-size: 18px; font-weight: 300; color: var(--muted); max-width: 600px; margin-bottom: 2.5rem; line-height: 1.7; transition: color var(--transition); }
     .hero-actions { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
     .btn-primary {
       display: inline-flex; align-items: center; gap: 10px;
       font-family: var(--sans); font-size: 14px; font-weight: 700;
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--bg); background: var(--accent);
-      padding: 14px 28px; border-radius: 3px;
-      text-decoration: none; border: none; cursor: pointer;
+      padding: 14px 28px; border-radius: 3px; text-decoration: none; border: none; cursor: pointer;
       transition: opacity 0.2s, transform 0.15s, background var(--transition), color var(--transition);
     }
     .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
     .btn-primary svg { width: 16px; height: 16px; }
-    .btn-secondary {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-family: var(--sans); font-size: 13px; font-weight: 600;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--muted); text-decoration: none; transition: color 0.2s;
-    }
+    .btn-secondary { display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
     .btn-secondary:hover { color: var(--text); }
     .hero-meta { margin-top: 1.5rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
-    .hero-meta-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); transition: color var(--transition); }
-    .hero-meta-item .dot { color: var(--accent); font-size: 8px; transition: color var(--transition); }
+    .hero-meta-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .hero-meta-item .dot { color: var(--accent); font-size: 8px; }
 
-    /* ═══════════════════════════════
-       SECTION HEADERS
-    ═══════════════════════════════ */
+    /* ── SECTION HEADERS ── */
     .section-header { margin-bottom: 3rem; }
-    .section-label {
-      font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
-      text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
-      display: flex; align-items: center; gap: 8px;
-      transition: color var(--transition);
-    }
-    .section-label::before { content:''; display:block; width:20px; height:1px; background:var(--accent); transition:background var(--transition); }
-    .section-title {
-      font-family: var(--sans); font-size: clamp(28px, 3.5vw, 42px); font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.01em; color: var(--text); line-height: 1.1;
-      transition: color var(--transition);
-    }
-    .section-desc { margin-top: 1rem; font-size: 16px; font-weight: 300; color: var(--muted); max-width: 560px; line-height: 1.7; transition: color var(--transition); }
+    .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px; transition: color var(--transition); }
+    .section-label::before { content:''; display:block; width:20px; height:1px; background:var(--accent); }
+    .section-title { font-family: var(--sans); font-size: clamp(28px,3.5vw,42px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; color: var(--text); line-height: 1.1; transition: color var(--transition); }
+    .section-desc { margin-top: 1rem; font-size: 16px; font-weight: 300; color: var(--muted); max-width: 600px; line-height: 1.7; transition: color var(--transition); }
 
-    .divider { border: none; border-top: 1px solid var(--border); margin: 0; transition: border-color var(--transition); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
     section { padding: 80px 0; }
 
-    /* ═══════════════════════════════
-       FEATURE CARDS
-    ═══════════════════════════════ */
-    .features-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1px; background: var(--border);
-      border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-      transition: background var(--transition), border-color var(--transition);
-    }
+    /* ── FEATURE CARDS ── */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: background var(--transition), border-color var(--transition); }
     .feature-card { background: var(--surface); padding: 2rem; position: relative; transition: background 0.2s; }
     .feature-card:hover { background: var(--surface2); }
-    .feature-icon {
-      width: 36px; height: 36px; border: 1px solid var(--border2); border-radius: 3px;
-      display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;
-      transition: border-color var(--transition);
-    }
+    .feature-icon { width: 36px; height: 36px; border: 1px solid var(--border2); border-radius: 3px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; transition: border-color var(--transition); }
     .feature-icon svg { width: 18px; height: 18px; }
     .feature-title { font-family: var(--sans); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); margin-bottom: 0.6rem; transition: color var(--transition); }
     .feature-desc { font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.65; transition: color var(--transition); }
     .feature-tag { position: absolute; top: 1.5rem; right: 1.5rem; }
 
-    /* ═══════════════════════════════
-       SORA STEPS
-    ═══════════════════════════════ */
-    .sora-steps {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-      transition: border-color var(--transition);
-    }
+    /* ── SORA STEPS ── */
+    .sora-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
     .sora-step { border-right: 1px solid var(--border); padding: 1.5rem; background: var(--surface); position: relative; transition: background var(--transition), border-color var(--transition); }
     .sora-step:last-child { border-right: none; }
-    .step-number { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 0.5rem; transition: color var(--transition); }
+    .step-number { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 0.5rem; }
     .step-name { font-family: var(--sans); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); margin-bottom: 0.4rem; transition: color var(--transition); }
-    .step-detail { font-size: 12px; font-weight: 300; color: var(--muted); line-height: 1.5; transition: color var(--transition); }
-    .step-indicator { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; position: absolute; top: 1.5rem; right: 1.5rem; transition: background var(--transition); }
+    .step-detail { font-size: 12px; font-weight: 300; color: var(--muted); line-height: 1.5; }
+    .step-indicator { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; position: absolute; top: 1.5rem; right: 1.5rem; }
 
-    /* ═══════════════════════════════
-       APP PREVIEW MOCK
-    ═══════════════════════════════ */
+    /* ── APP PREVIEW MOCK ── */
     .app-preview { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; transition: background var(--transition), border-color var(--transition); }
-    .app-preview-bar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 8px; transition: background var(--transition), border-color var(--transition); }
-    .app-preview-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); transition: background var(--transition); }
-    .app-preview-title { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: 1; text-align: center; transition: color var(--transition); }
+    .app-preview-bar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+    .app-preview-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+    .app-preview-title { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: 1; text-align: center; }
     .app-preview-body { padding: 2rem; display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; min-height: 320px; }
     .app-sidebar-mock { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; transition: background var(--transition), border-color var(--transition); }
-    .mock-nav-item { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-radius: 2px; transition: color var(--transition); }
-    .mock-nav-item.active { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border-left: 2px solid var(--accent); transition: color var(--transition), background var(--transition); }
+    .mock-nav-item { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-radius: 2px; }
+    .mock-nav-item.active { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border-left: 2px solid var(--accent); }
     .app-content-mock { display: flex; flex-direction: column; gap: 1rem; }
     .mock-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 1rem; transition: background var(--transition), border-color var(--transition); }
-    .mock-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; transition: color var(--transition); }
-    .mock-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); transition: border-color var(--transition); }
+    .mock-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; }
+    .mock-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
     .mock-row:last-child { border-bottom: none; }
-    .mock-row-label { font-size: 11px; color: var(--muted); font-family: var(--sans); transition: color var(--transition); }
-    .mock-row-value { font-family: var(--mono); font-size: 11px; color: var(--text); transition: color var(--transition); }
+    .mock-row-label { font-size: 11px; color: var(--muted); font-family: var(--sans); }
+    .mock-row-value { font-family: var(--mono); font-size: 11px; color: var(--text); }
     .mock-row-value.green { color: var(--accent); }
     .mock-row-value.amber { color: var(--accent2); }
     .mock-row-value.cyan  { color: var(--accent3); }
 
-    /* ═══════════════════════════════
-       REGULATORY TABLE
-    ═══════════════════════════════ */
+    /* ── REGULATORY TABLE ── */
     .reg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .reg-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface2); font-weight: 400; transition: color var(--transition), background var(--transition), border-color var(--transition); }
-    .reg-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 300; vertical-align: top; transition: color var(--transition), border-color var(--transition); }
-    .reg-table td:first-child { font-family: var(--mono); font-size: 11px; color: var(--accent3); white-space: nowrap; transition: color var(--transition); }
+    .reg-table th { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface2); font-weight: 400; }
+    .reg-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 300; vertical-align: top; }
+    .reg-table td:first-child { font-family: var(--mono); font-size: 11px; color: var(--accent3); white-space: nowrap; }
     .reg-table td:nth-child(2) { color: var(--text); font-weight: 400; }
     .reg-table tr:last-child td { border-bottom: none; }
 
-    /* ═══════════════════════════════
-       DOWNLOAD SECTION
-    ═══════════════════════════════ */
-    .download-box {
-      background: var(--surface); border: 1px solid var(--border2); border-radius: 4px;
-      padding: 2.5rem; display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center;
-      transition: background var(--transition), border-color var(--transition);
-    }
+    /* ── DOWNLOAD SECTION ── */
+    .download-box { background: var(--surface); border: 1px solid var(--border2); border-radius: 4px; padding: 2.5rem; display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center; transition: background var(--transition), border-color var(--transition); }
     @media (max-width: 700px) { .download-box { grid-template-columns: 1fr; } }
-    .download-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.6rem; transition: color var(--transition); }
+    .download-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.6rem; }
     .download-version { font-family: var(--sans); font-size: 28px; font-weight: 700; text-transform: uppercase; color: var(--text); margin-bottom: 0.5rem; transition: color var(--transition); }
     .download-meta { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.6; transition: color var(--transition); }
     .download-meta strong { color: var(--text); font-weight: 500; }
-    .download-platform { display: flex; align-items: center; gap: 8px; margin-top: 0.75rem; font-family: var(--mono); font-size: 11px; color: var(--accent2); transition: color var(--transition); }
+    .download-platform { display: flex; align-items: center; gap: 8px; margin-top: 0.75rem; font-family: var(--mono); font-size: 11px; color: var(--accent2); }
     .download-platform svg { width: 14px; height: 14px; }
-    .platform-note { margin-top: 0.5rem; font-size: 12px; color: var(--muted); font-style: italic; transition: color var(--transition); }
-
-    .btn-download {
-      display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
-      font-family: var(--sans); font-size: 13px; font-weight: 700;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--bg); background: var(--accent);
-      padding: 18px 32px; border-radius: 3px;
-      text-decoration: none; white-space: nowrap;
-      transition: opacity 0.2s, background var(--transition), color var(--transition);
-    }
+    .platform-note { margin-top: 0.5rem; font-size: 12px; color: var(--muted); font-style: italic; }
+    .btn-download { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bg); background: var(--accent); padding: 18px 32px; border-radius: 3px; text-decoration: none; white-space: nowrap; transition: opacity 0.2s, background var(--transition), color var(--transition); }
     .btn-download:hover { opacity: 0.85; }
     .btn-download .sub { font-size: 10px; font-weight: 400; letter-spacing: 0.08em; opacity: 0.75; }
+    .version-badge { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-top: 0.6rem; text-align: center; }
 
-    .version-badge {
-      display: inline-block;
-      font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
-      color: var(--muted); margin-top: 0.6rem; text-align: center;
-      transition: color var(--transition);
-    }
-
-    /* ═══════════════════════════════
-       SYSTEM REQUIREMENTS
-    ═══════════════════════════════ */
-    .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: background var(--transition), border-color var(--transition); }
+    /* ── SYSTEM REQUIREMENTS ── */
+    .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
     .req-item { background: var(--surface); padding: 1.5rem; transition: background var(--transition); }
-    .req-icon { font-family: var(--mono); font-size: 18px; color: var(--accent); margin-bottom: 0.75rem; transition: color var(--transition); }
+    .req-icon { font-family: var(--mono); font-size: 18px; color: var(--accent); margin-bottom: 0.75rem; }
     .req-title { font-family: var(--sans); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); margin-bottom: 0.4rem; transition: color var(--transition); }
-    .req-detail { font-size: 13px; font-weight: 300; color: var(--muted); transition: color var(--transition); }
+    .req-detail { font-size: 13px; font-weight: 300; color: var(--muted); }
 
-    /* ═══════════════════════════════
-       FOOTER
-    ═══════════════════════════════ */
+    /* ── FOOTER ── */
     footer { background: var(--surface); border-top: 1px solid var(--border); padding: 3rem 0; transition: background var(--transition), border-color var(--transition); }
     .footer-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; }
     @media (max-width: 600px) { .footer-inner { grid-template-columns: 1fr; } }
-    .footer-logo { font-family: var(--sans); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); margin-bottom: 0.75rem; transition: color var(--transition); }
-    .footer-logo span { color: var(--accent); transition: color var(--transition); }
-    .footer-desc { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.65; max-width: 300px; transition: color var(--transition); }
+    .footer-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem; }
+    .footer-logo-mark { width: 28px; height: 28px; background: #000; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .footer-logo-mark svg { width: 24px; height: 24px; }
+    .footer-logo-text { font-family: var(--sans); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); transition: color var(--transition); }
+    .footer-logo-text span { color: var(--accent); }
+    .footer-desc { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.65; max-width: 300px; }
     .footer-links { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
     .footer-links a { font-family: var(--sans); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
     .footer-links a:hover { color: var(--text); }
-    .footer-bottom { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; transition: border-color var(--transition); }
-    .footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted); transition: color var(--transition); }
+    .footer-bottom { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
 
-    /* ═══════════════════════════════
-       SCROLL REVEAL
-    ═══════════════════════════════ */
+    /* ── SCROLL REVEAL ── */
     [data-reveal] { opacity: 0; transform: translateY(16px); transition: opacity 0.5s ease, transform 0.5s ease; }
     [data-reveal].visible { opacity: 1; transform: none; }
 
@@ -371,43 +263,53 @@
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════════════════
+     SHARED LOGO SVG  (reused in topbar + footer)
+     Source: exact paths from app's index.html SVG
+═══════════════════════════════════════════════════ -->
+<svg style="display:none">
+  <symbol id="md-logo" viewBox="0 0 210 210">
+    <!-- Green ring -->
+    <circle cx="106" cy="106" r="61.5"
+      fill="none" stroke="#009800" stroke-width="15"/>
+    <!-- Left arrow blade -->
+    <path d="M 103.9 36.3 L 55.5 201.4 L 103.9 157.8 Z"
+      fill="#000" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>
+    <!-- Right arrow blade -->
+    <path d="M 106.3 36.3 L 154.8 201.4 L 106.3 157.8 Z"
+      fill="#000" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
 <!-- ═══ TOP BAR ═══ -->
 <nav class="topbar">
   <div class="container inner">
     <a href="#" class="topbar-logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L14 5.5V10.5L8 14L2 10.5V5.5L8 2Z" stroke="var(--accent)" stroke-width="1.2" fill="none"/>
-          <circle cx="8" cy="8" r="2" fill="var(--accent)"/>
-        </svg>
+      <div class="logo-mark">
+        <svg><use href="#md-logo"/></svg>
       </div>
       <span class="wordmark">Mission<span>Desk</span></span>
     </a>
-
     <div class="topbar-nav">
       <a href="#features"    data-i18n="nav.features">Features</a>
       <a href="#sora"        data-i18n="nav.sora">SORA v2.5</a>
       <a href="#regulations" data-i18n="nav.regulations">Regulations</a>
     </div>
-
     <div class="nav-controls">
-      <!-- Language toggle -->
       <button class="icon-btn" id="langToggle" title="Switch language" aria-label="Switch language">
         <span id="langFlag">🇸🇪</span>
       </button>
-      <!-- Theme toggle -->
       <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
-        <!-- moon (shown in dark mode) -->
-        <svg class="theme-icon-dark" width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <!-- Moon: shown in light mode (click → go dark) -->
+        <svg class="theme-icon-light" width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M12.5 9A6 6 0 015 1.5a.5.5 0 00-.6.65A6 6 0 1012.35 9.6.5.5 0 0012.5 9z" fill="currentColor"/>
         </svg>
-        <!-- sun (shown in light mode) -->
-        <svg class="theme-icon-light" width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <!-- Sun: shown in dark mode (click → go light) -->
+        <svg class="theme-icon-dark" width="14" height="14" viewBox="0 0 14 14" fill="none">
           <circle cx="7" cy="7" r="2.8" fill="currentColor"/>
           <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1 1M10.1 10.1l1 1M2.9 11.1l1-1M10.1 3.9l1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
       </button>
-      <!-- Download CTA -->
       <a href="#download" class="btn-nav" data-i18n="nav.download">Download</a>
     </div>
   </div>
@@ -418,7 +320,7 @@
   <div class="container" style="max-width:900px;">
     <div class="hero-badge">
       <div class="badge-dot"></div>
-      <span class="badge-text" id="heroBadge">v3.0 · SORA v2.5 Compliant</span>
+      <span class="badge-text" id="heroBadge">v3.109 · SORA v2.5 Compliant</span>
     </div>
     <h1 class="hero-headline">
       Professional UAS<br>
@@ -457,7 +359,7 @@
         <div class="app-preview-dot"></div>
         <div class="app-preview-dot"></div>
         <div class="app-preview-dot"></div>
-        <span class="app-preview-title">MissionDesk v3.0 · SORA Risk Assessment · Mission: Inspection Alpha-7</span>
+        <span class="app-preview-title">MissionDesk v3.109 · SORA Risk Assessment · Mission: Inspection Alpha-7</span>
       </div>
       <div class="app-preview-body">
         <div class="app-sidebar-mock">
@@ -467,6 +369,7 @@
           <div class="mock-nav-item">OSO Scoring</div>
           <div class="mock-nav-item">Containment</div>
           <div class="mock-nav-item">ARC</div>
+          <div class="mock-nav-item">Briefing</div>
           <div class="mock-nav-item">Report / PDF</div>
           <div class="mock-nav-item">Settings</div>
         </div>
@@ -500,7 +403,7 @@
     <div class="section-header" data-reveal>
       <div class="section-label" data-i18n="feat.label">Features</div>
       <h2 class="section-title" data-i18n="feat.title">Everything you need<br>for the Specific category</h2>
-      <p class="section-desc" data-i18n="feat.desc">MissionDesk guides you step by step through the full SORA assessment – from iGRC to final SAIL classification and PDF report.</p>
+      <p class="section-desc" data-i18n="feat.desc">MissionDesk guides you step by step through the full SORA assessment, mission briefing, and pre-flight preparation – from iGRC to final SAIL classification and PDF report.</p>
     </div>
     <div class="features-grid" data-reveal>
 
@@ -533,6 +436,20 @@
       </div>
 
       <div class="feature-card">
+        <div class="feature-icon"><svg viewBox="0 0 18 18" fill="none"><path d="M3 9h12M10 5l4 4-4 4" stroke="var(--accent3)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="5" height="5" rx="0.5" stroke="var(--accent3)" stroke-width="1.2"/></svg></div>
+        <div class="feature-title" data-i18n="feat.import.title">Mission Import</div>
+        <p class="feature-desc" data-i18n="feat.import.desc">Import mission files directly from ArduPilot Mission Planner or Litchi. MissionDesk uses the waypoint data as the foundation for the full risk assessment and briefing.</p>
+        <div class="feature-tag"><span class="tag cyan">Import</span></div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 4v6l-7 4-7-4V6l7-4z" stroke="var(--accent2)" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 6v4M9 12v.5" stroke="var(--accent2)" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+        <div class="feature-title" data-i18n="feat.brief.title">Pre-flight Briefing</div>
+        <p class="feature-desc" data-i18n="feat.brief.desc">Generates a complete pre-flight briefing including current METAR / TAF weather, NOTAMs, and radio frequencies for aerodromes along the planned route.</p>
+        <div class="feature-tag"><span class="tag amber">Briefing</span></div>
+      </div>
+
+      <div class="feature-card">
         <div class="feature-icon"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2l1.8 5.4H17l-4.9 3.6 1.8 5.4L9 13l-4.9 3.4 1.8-5.4L2 7.4h6.2L9 2z" stroke="var(--accent2)" stroke-width="1.2" stroke-linejoin="round"/></svg></div>
         <div class="feature-title" data-i18n="feat.sail.title">SAIL &amp; Category</div>
         <p class="feature-desc" data-i18n="feat.sail.desc">Automatic SAIL determination from GRC and ARC. Classifies the operation as Open, Specific (PDRA / STS / ConOps), or Certified category per EU 2019/947.</p>
@@ -542,7 +459,7 @@
       <div class="feature-card">
         <div class="feature-icon"><svg viewBox="0 0 18 18" fill="none"><path d="M4 4h10v12H4z" stroke="var(--accent3)" stroke-width="1.2"/><path d="M7 8h4M7 11h3" stroke="var(--accent3)" stroke-width="1.2" stroke-linecap="round"/><path d="M11 4V2.5M7 4V2.5" stroke="var(--accent3)" stroke-width="1.2" stroke-linecap="round"/></svg></div>
         <div class="feature-title" data-i18n="feat.pdf.title">PDF Report</div>
-        <p class="feature-desc" data-i18n="feat.pdf.desc">Generates a structured PDF report covering the complete assessment. Ready to attach to an authorisation application submitted to your national CAA.</p>
+        <p class="feature-desc" data-i18n="feat.pdf.desc">Generates a structured PDF report covering the complete assessment and briefing. Ready to attach to an authorisation application submitted to your national CAA.</p>
         <div class="feature-tag"><span class="tag cyan">Export</span></div>
       </div>
 
@@ -561,42 +478,12 @@
       <p class="section-desc" data-i18n="sora.desc">MissionDesk implements SORA v2.5 (ED Decision 2025/018/R) in full – with an abort-on-error pipeline that halts on invalid inputs before they propagate.</p>
     </div>
     <div class="sora-steps" data-reveal>
-      <div class="sora-step">
-        <div class="step-indicator"></div>
-        <div class="step-number">STEP 01</div>
-        <div class="step-name" data-i18n="sora.s1.name">Scenario</div>
-        <div class="step-detail" data-i18n="sora.s1.detail">UAS model, wingspan, speed, operation type</div>
-      </div>
-      <div class="sora-step">
-        <div class="step-indicator" style="background:var(--accent2)"></div>
-        <div class="step-number">STEP 02</div>
-        <div class="step-name">iGRC</div>
-        <div class="step-detail" data-i18n="sora.s2.detail">Intrinsic Ground Risk Class from SORA Table 2</div>
-      </div>
-      <div class="sora-step">
-        <div class="step-indicator"></div>
-        <div class="step-number">STEP 03</div>
-        <div class="step-name" data-i18n="sora.s3.name">Containment</div>
-        <div class="step-detail" data-i18n="sora.s3.detail">GRC mitigation via containment strategy</div>
-      </div>
-      <div class="sora-step">
-        <div class="step-indicator" style="background:var(--accent3)"></div>
-        <div class="step-number">STEP 05</div>
-        <div class="step-name">ARC</div>
-        <div class="step-detail" data-i18n="sora.s5.detail">Air Risk Class + U-space mitigation</div>
-      </div>
-      <div class="sora-step">
-        <div class="step-indicator" style="background:var(--accent2)"></div>
-        <div class="step-number">STEP 08</div>
-        <div class="step-name">OSO</div>
-        <div class="step-detail" data-i18n="sora.s8.detail">24 Operational Safety Objectives</div>
-      </div>
-      <div class="sora-step" style="border-right:none;">
-        <div class="step-indicator"></div>
-        <div class="step-number">STEP 09</div>
-        <div class="step-name">SAIL</div>
-        <div class="step-detail" data-i18n="sora.s9.detail">Specific Assurance &amp; Integrity Level + category</div>
-      </div>
+      <div class="sora-step"><div class="step-indicator"></div><div class="step-number">STEP 01</div><div class="step-name" data-i18n="sora.s1.name">Scenario</div><div class="step-detail" data-i18n="sora.s1.detail">UAS model, wingspan, speed, operation type</div></div>
+      <div class="sora-step"><div class="step-indicator" style="background:var(--accent2)"></div><div class="step-number">STEP 02</div><div class="step-name">iGRC</div><div class="step-detail" data-i18n="sora.s2.detail">Intrinsic Ground Risk Class from SORA Table 2</div></div>
+      <div class="sora-step"><div class="step-indicator"></div><div class="step-number">STEP 03</div><div class="step-name" data-i18n="sora.s3.name">Containment</div><div class="step-detail" data-i18n="sora.s3.detail">GRC mitigation via containment strategy</div></div>
+      <div class="sora-step"><div class="step-indicator" style="background:var(--accent3)"></div><div class="step-number">STEP 05</div><div class="step-name">ARC</div><div class="step-detail" data-i18n="sora.s5.detail">Air Risk Class + U-space mitigation</div></div>
+      <div class="sora-step"><div class="step-indicator" style="background:var(--accent2)"></div><div class="step-number">STEP 08</div><div class="step-name">OSO</div><div class="step-detail" data-i18n="sora.s8.detail">24 Operational Safety Objectives</div></div>
+      <div class="sora-step" style="border-right:none;"><div class="step-indicator"></div><div class="step-number">STEP 09</div><div class="step-name">SAIL</div><div class="step-detail" data-i18n="sora.s9.detail">Specific Assurance &amp; Integrity Level + category</div></div>
     </div>
   </div>
 </section>
@@ -647,7 +534,7 @@
     <div class="download-box" data-reveal>
       <div>
         <div class="download-label" data-i18n="dl.latest">Latest release</div>
-        <div class="download-version" id="dlVersion">MissionDesk v3.0</div>
+        <div class="download-version" id="dlVersion">MissionDesk v3.109</div>
         <div class="download-meta">
           <strong data-i18n="dl.beta">Beta release</strong> · SORA v2.5 (ED Decision 2025/018/R)<br>
           <span data-i18n="dl.free">Free to download and use. No registration required.</span>
@@ -664,12 +551,8 @@
         <div class="platform-note" data-i18n="dl.winOnly">Currently available for Windows only. macOS and Linux are planned for a future release.</div>
       </div>
       <div style="text-align:center;">
-        <!--
-          /releases/latest/download/ always resolves to the newest GitHub release.
-          The filename is updated automatically by the JS below when it fetches
-          the GitHub API – no manual HTML edits needed on future releases.
-        -->
-        <a id="dlBtn" href="https://github.com/tevekanna/MissionDesk/releases/latest/download/MissionDesk_3.0.0_x64-setup.exe"
+        <a id="dlBtn"
+           href="https://github.com/tevekanna/missiondesk.se/releases/latest/download/MissionDesk_3.109_x64-setup.exe"
            class="btn-download">
           <svg style="width:20px;height:20px;" viewBox="0 0 20 20" fill="none">
             <path d="M10 3v10M6 10l4 4 4-4M3 16h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -677,37 +560,20 @@
           <span data-i18n="dl.btn">Download .exe</span>
           <span class="sub">Installer · Windows</span>
         </a>
-        <div class="version-badge" id="versionBadge">fetching version…</div>
+        <div class="version-badge" id="versionBadge">v3.109</div>
         <div style="margin-top:0.75rem;">
-          <a href="https://github.com/tevekanna/MissionDesk/releases" class="btn-secondary" style="font-size:11px;" data-i18n="dl.allReleases">
+          <a href="https://github.com/tevekanna/missiondesk.se/releases" class="btn-secondary" style="font-size:11px;" data-i18n="dl.allReleases">
             All releases on GitHub →
           </a>
         </div>
       </div>
     </div>
-
     <div style="margin-top:1.5rem;" data-reveal>
       <div class="req-grid">
-        <div class="req-item">
-          <div class="req-icon">[OS]</div>
-          <div class="req-title" data-i18n="req.os.title">Operating System</div>
-          <div class="req-detail" data-i18n="req.os.detail">Windows 10 or Windows 11 (64-bit). WebView2 Runtime is bundled with the installer.</div>
-        </div>
-        <div class="req-item">
-          <div class="req-icon">[CPU]</div>
-          <div class="req-title" data-i18n="req.cpu.title">Processor</div>
-          <div class="req-detail" data-i18n="req.cpu.detail">Any x64-compatible processor. No specific performance requirements.</div>
-        </div>
-        <div class="req-item">
-          <div class="req-icon">[NET]</div>
-          <div class="req-title" data-i18n="req.net.title">Internet</div>
-          <div class="req-detail" data-i18n="req.net.detail">Optional – required for the airspace map (OpenAIP API key) and METAR data (CheckWX). Offline mode is supported.</div>
-        </div>
-        <div class="req-item">
-          <div class="req-icon">[KEY]</div>
-          <div class="req-title" data-i18n="req.key.title">API Keys</div>
-          <div class="req-detail" data-i18n="req.key.detail">OpenAIP and CheckWX API keys are configured on the application's Settings page. Free tiers are available from both providers.</div>
-        </div>
+        <div class="req-item"><div class="req-icon">[OS]</div><div class="req-title" data-i18n="req.os.title">Operating System</div><div class="req-detail" data-i18n="req.os.detail">Windows 10 or Windows 11 (64-bit). WebView2 Runtime is bundled with the installer.</div></div>
+        <div class="req-item"><div class="req-icon">[CPU]</div><div class="req-title" data-i18n="req.cpu.title">Processor</div><div class="req-detail" data-i18n="req.cpu.detail">Any x64-compatible processor. No specific performance requirements.</div></div>
+        <div class="req-item"><div class="req-icon">[NET]</div><div class="req-title" data-i18n="req.net.title">Internet</div><div class="req-detail" data-i18n="req.net.detail">Optional – required for the airspace map (OpenAIP API key) and METAR / TAF weather data (CheckWX). Offline mode is supported.</div></div>
+        <div class="req-item"><div class="req-icon">[KEY]</div><div class="req-title" data-i18n="req.key.title">API Keys</div><div class="req-detail" data-i18n="req.key.detail">OpenAIP and CheckWX API keys are configured on the application's Settings page. Free tiers are available from both providers.</div></div>
       </div>
     </div>
   </div>
@@ -720,7 +586,12 @@
   <div class="container">
     <div class="footer-inner">
       <div>
-        <div class="footer-logo">Mission<span>Desk</span></div>
+        <div class="footer-logo">
+          <div class="footer-logo-mark">
+            <svg><use href="#md-logo"/></svg>
+          </div>
+          <div class="footer-logo-text">Mission<span>Desk</span></div>
+        </div>
         <p class="footer-desc" data-i18n="footer.desc">Professional UAS mission planning for EU operators. Built for the Specific category – with a correct, verified implementation of SORA v2.5.</p>
       </div>
       <div class="footer-links">
@@ -728,7 +599,7 @@
         <a href="#sora"        data-i18n="nav.sora">SORA v2.5</a>
         <a href="#regulations" data-i18n="nav.regulations">Regulations</a>
         <a href="#download"    data-i18n="nav.download">Download</a>
-        <a href="https://github.com/tevekanna/MissionDesk" target="_blank" rel="noopener">GitHub →</a>
+        <a href="https://github.com/tevekanna/missiondesk.se" target="_blank" rel="noopener">GitHub →</a>
       </div>
     </div>
     <div class="footer-bottom">
@@ -741,262 +612,162 @@
 </footer>
 
 <script>
-/* ═══════════════════════════════════════════════════
-   TRANSLATIONS
-═══════════════════════════════════════════════════ */
+/* ═══ TRANSLATIONS ═══ */
 const i18n = {
   en: {
-    'nav.features':    'Features',
-    'nav.sora':        'SORA v2.5',
-    'nav.regulations': 'Regulations',
-    'nav.download':    'Download',
-    'hero.line2':      'Mission Planning',
-    'hero.sub':        'Structured risk assessment and regulatory compliance for drone operations in the EU. Built for pilots and operators conducting missions in the Specific category – with full support for SORA v2.5, EU\u00a02019/947 and U-space.',
-    'hero.cta':        'Download free',
-    'hero.secondary':  'Explore features \u2192',
-    'mock.wingspan':   'UAS wingspan',
-    'mock.speed':      'Operating speed',
-    'mock.pop':        'Population density',
-    'mock.controlled': 'Controlled',
-    'mock.airspace':   'Airspace class',
-    'feat.label':      'Features',
-    'feat.title':      'Everything you need<br>for the Specific category',
-    'feat.desc':       'MissionDesk guides you step by step through the full SORA assessment \u2013 from iGRC to final SAIL classification and PDF report.',
-    'feat.igrc.title': 'iGRC Calculation',
-    'feat.igrc.desc':  'Automatic calculation of the intrinsic Ground Risk Class based on UAS dimensions, operating speed, and population density, in accordance with SORA v2.5 Table\u00a02.',
-    'feat.arc.title':  'ARC Determination',
-    'feat.arc.desc':   'Air Risk Class is determined from airspace class and altitude. Full support for U-space airspace (EU\u00a02021/664), including automatic ARC mitigation via U-space services.',
-    'feat.oso.title':  'OSO Scoring',
-    'feat.oso.desc':   'Interactive assessment of all 24 Operational Safety Objectives. Each OSO is linked to its robustness criterion (M/D/O) and adequacy level (Low\u00a0/\u00a0Medium\u00a0/\u00a0High\u00a0/\u00a0Very\u00a0High).',
-    'feat.cont.title': 'Containment',
-    'feat.cont.desc':  'Assessment of the operational volume, contingency zone, and ground risk buffer. Determines GRC mitigation credit based on the selected containment strategy.',
-    'feat.sail.title': 'SAIL & Category',
-    'feat.sail.desc':  'Automatic SAIL determination from GRC and ARC. Classifies the operation as Open, Specific (PDRA\u00a0/\u00a0STS\u00a0/\u00a0ConOps), or Certified category per EU\u00a02019/947.',
-    'feat.pdf.title':  'PDF Report',
-    'feat.pdf.desc':   'Generates a structured PDF report covering the complete assessment. Ready to attach to an authorisation application submitted to your national CAA.',
-    'sora.label':      'SORA v2.5 Workflow',
-    'sora.title':      'The full process,<br>one step at a time',
-    'sora.desc':       'MissionDesk implements SORA v2.5 (ED Decision 2025/018/R) in full \u2013 with an abort-on-error pipeline that halts on invalid inputs before they propagate.',
-    'sora.s1.name':    'Scenario',
-    'sora.s1.detail':  'UAS model, wingspan, speed, operation type',
-    'sora.s2.detail':  'Intrinsic Ground Risk Class from SORA Table 2',
-    'sora.s3.name':    'Containment',
-    'sora.s3.detail':  'GRC mitigation via containment strategy',
-    'sora.s5.detail':  'Air Risk Class + U-space mitigation',
-    'sora.s8.detail':  '24 Operational Safety Objectives',
-    'sora.s9.detail':  'Specific Assurance & Integrity Level + category',
-    'reg.label':       'Regulatory Basis',
-    'reg.title':       'Built on the correct<br>regulatory framework',
-    'reg.desc':        'All calculations and workflows are verified against current EASA documents and EU regulations.',
-    'reg.tableTitle':  'Regulatory References',
-    'reg.col1':        'Reference',
-    'reg.col2':        'Document',
-    'reg.col3':        'Application',
-    'reg.r1.doc':      'Rules and procedures for UAS operations',
-    'reg.r1.app':      'Operation category, STS, PDRA, UAS.SPEC requirements',
-    'reg.r2.doc':      'UAS design and manufacture',
-    'reg.r2.app':      'UA classes C0\u2013C6, CE marking',
-    'reg.r3.doc':      'Specific Operations Risk Assessment',
-    'reg.r4.doc':      'AMC & GM to EU 2019/947',
-    'reg.r4.app':      'Detailed requirements and guidance for SORA',
-    'reg.r5.doc':      'U-space regulatory framework',
-    'reg.r5.app':      'U-space airspace, ARC mitigation via U-space services',
-    'reg.r6.doc':      'Critical Area Assessment Tool',
-    'reg.r6.app':      'GRC modelling, Critical Area calculation',
-    'dl.label':        'Download',
-    'dl.title':        'Download<br>MissionDesk',
-    'dl.latest':       'Latest release',
-    'dl.beta':         'Beta release',
-    'dl.free':         'Free to download and use. No registration required.',
-    'dl.winOnly':      'Currently available for Windows only. macOS and Linux are planned for a future release.',
-    'dl.btn':          'Download .exe',
-    'dl.allReleases':  'All releases on GitHub \u2192',
-    'req.os.title':    'Operating System',
-    'req.os.detail':   'Windows 10 or Windows 11 (64-bit). WebView2 Runtime is bundled with the installer.',
-    'req.cpu.title':   'Processor',
-    'req.cpu.detail':  'Any x64-compatible processor. No specific performance requirements.',
-    'req.net.title':   'Internet',
-    'req.net.detail':  'Optional \u2013 required for the airspace map (OpenAIP API key) and METAR data (CheckWX). Offline mode is supported.',
-    'req.key.title':   'API Keys',
-    'req.key.detail':  'OpenAIP and CheckWX API keys are configured on the application\u2019s Settings page. Free tiers are available from both providers.',
-    'footer.desc':     'Professional UAS mission planning for EU operators. Built for the Specific category \u2013 with a correct, verified implementation of SORA v2.5.',
+    'nav.features':'Features','nav.sora':'SORA v2.5','nav.regulations':'Regulations','nav.download':'Download',
+    'hero.line2':'Mission Planning',
+    'hero.sub':'Structured risk assessment and regulatory compliance for drone operations in the EU. Built for pilots and operators conducting missions in the Specific category \u2013 with full support for SORA v2.5, EU\u00a02019/947 and U-space.',
+    'hero.cta':'Download free','hero.secondary':'Explore features \u2192',
+    'mock.wingspan':'UAS wingspan','mock.speed':'Operating speed','mock.pop':'Population density','mock.controlled':'Controlled','mock.airspace':'Airspace class',
+    'feat.label':'Features','feat.title':'Everything you need<br>for the Specific category',
+    'feat.desc':'MissionDesk guides you step by step through the full SORA assessment, mission briefing, and pre-flight preparation \u2013 from iGRC to final SAIL classification and PDF report.',
+    'feat.igrc.title':'iGRC Calculation','feat.igrc.desc':'Automatic calculation of the intrinsic Ground Risk Class based on UAS dimensions, operating speed, and population density, in accordance with SORA v2.5 Table\u00a02.',
+    'feat.arc.title':'ARC Determination','feat.arc.desc':'Air Risk Class is determined from airspace class and altitude. Full support for U-space airspace (EU\u00a02021/664), including automatic ARC mitigation via U-space services.',
+    'feat.oso.title':'OSO Scoring','feat.oso.desc':'Interactive assessment of all 24 Operational Safety Objectives. Each OSO is linked to its robustness criterion (M/D/O) and adequacy level (Low\u00a0/\u00a0Medium\u00a0/\u00a0High\u00a0/\u00a0Very\u00a0High).',
+    'feat.cont.title':'Containment','feat.cont.desc':'Assessment of the operational volume, contingency zone, and ground risk buffer. Determines GRC mitigation credit based on the selected containment strategy.',
+    'feat.import.title':'Mission Import','feat.import.desc':'Import mission files directly from ArduPilot Mission Planner or Litchi. MissionDesk uses the waypoint data as the foundation for the full risk assessment and briefing.',
+    'feat.brief.title':'Pre-flight Briefing','feat.brief.desc':'Generates a complete pre-flight briefing including current METAR\u00a0/\u00a0TAF weather, NOTAMs, and radio frequencies for aerodromes along the planned route.',
+    'feat.sail.title':'SAIL & Category','feat.sail.desc':'Automatic SAIL determination from GRC and ARC. Classifies the operation as Open, Specific (PDRA\u00a0/\u00a0STS\u00a0/\u00a0ConOps), or Certified category per EU\u00a02019/947.',
+    'feat.pdf.title':'PDF Report','feat.pdf.desc':'Generates a structured PDF report covering the complete assessment and briefing. Ready to attach to an authorisation application submitted to your national CAA.',
+    'sora.label':'SORA v2.5 Workflow','sora.title':'The full process,<br>one step at a time',
+    'sora.desc':'MissionDesk implements SORA v2.5 (ED Decision 2025/018/R) in full \u2013 with an abort-on-error pipeline that halts on invalid inputs before they propagate.',
+    'sora.s1.name':'Scenario','sora.s1.detail':'UAS model, wingspan, speed, operation type',
+    'sora.s2.detail':'Intrinsic Ground Risk Class from SORA Table 2',
+    'sora.s3.name':'Containment','sora.s3.detail':'GRC mitigation via containment strategy',
+    'sora.s5.detail':'Air Risk Class + U-space mitigation',
+    'sora.s8.detail':'24 Operational Safety Objectives',
+    'sora.s9.detail':'Specific Assurance & Integrity Level + category',
+    'reg.label':'Regulatory Basis','reg.title':'Built on the correct<br>regulatory framework',
+    'reg.desc':'All calculations and workflows are verified against current EASA documents and EU regulations.',
+    'reg.tableTitle':'Regulatory References','reg.col1':'Reference','reg.col2':'Document','reg.col3':'Application',
+    'reg.r1.doc':'Rules and procedures for UAS operations','reg.r1.app':'Operation category, STS, PDRA, UAS.SPEC requirements',
+    'reg.r2.doc':'UAS design and manufacture','reg.r2.app':'UA classes C0\u2013C6, CE marking',
+    'reg.r3.doc':'Specific Operations Risk Assessment',
+    'reg.r4.doc':'AMC & GM to EU 2019/947','reg.r4.app':'Detailed requirements and guidance for SORA',
+    'reg.r5.doc':'U-space regulatory framework','reg.r5.app':'U-space airspace, ARC mitigation via U-space services',
+    'reg.r6.doc':'Critical Area Assessment Tool','reg.r6.app':'GRC modelling, Critical Area calculation',
+    'dl.label':'Download','dl.title':'Download<br>MissionDesk','dl.latest':'Latest release',
+    'dl.beta':'Beta release','dl.free':'Free to download and use. No registration required.',
+    'dl.winOnly':'Currently available for Windows only. macOS and Linux are planned for a future release.',
+    'dl.btn':'Download .exe','dl.allReleases':'All releases on GitHub \u2192',
+    'req.os.title':'Operating System','req.os.detail':'Windows 10 or Windows 11 (64-bit). WebView2 Runtime is bundled with the installer.',
+    'req.cpu.title':'Processor','req.cpu.detail':'Any x64-compatible processor. No specific performance requirements.',
+    'req.net.title':'Internet','req.net.detail':'Optional \u2013 required for the airspace map (OpenAIP API key) and METAR\u00a0/\u00a0TAF weather data (CheckWX). Offline mode is supported.',
+    'req.key.title':'API Keys','req.key.detail':'OpenAIP and CheckWX API keys are configured on the application\u2019s Settings page. Free tiers are available from both providers.',
+    'footer.desc':'Professional UAS mission planning for EU operators. Built for the Specific category \u2013 with a correct, verified implementation of SORA v2.5.',
   },
   sv: {
-    'nav.features':    'Funktioner',
-    'nav.sora':        'SORA v2.5',
-    'nav.regulations': 'Regelverk',
-    'nav.download':    'Ladda ned',
-    'hero.line2':      'Uppdragsplanering',
-    'hero.sub':        'Strukturerad riskbed\u00f6mning och regulatorisk compliance f\u00f6r dr\u00f6noperationer i EU. Byggd f\u00f6r piloter och operat\u00f6rer som genomf\u00f6r uppdrag i specifik kategori \u2013 med fullt st\u00f6d f\u00f6r SORA v2.5, EU\u00a02019/947 och U-space.',
-    'hero.cta':        'Ladda ned gratis',
-    'hero.secondary':  'Utforska funktioner \u2192',
-    'mock.wingspan':   'UAS-vingbredd',
-    'mock.speed':      'Operationshastighet',
-    'mock.pop':        'Befolkningst\u00e4thet',
-    'mock.controlled': 'Kontrollerat omr\u00e5de',
-    'mock.airspace':   'Luftrumsklass',
-    'feat.label':      'Funktioner',
-    'feat.title':      'Allt du beh\u00f6ver<br>f\u00f6r specifik kategori',
-    'feat.desc':       'MissionDesk guidar dig steg f\u00f6r steg genom hela SORA-bed\u00f6mningen \u2013 fr\u00e5n iGRC till slutlig SAIL-klassificering och PDF-rapport.',
-    'feat.igrc.title': 'iGRC-ber\u00e4kning',
-    'feat.igrc.desc':  'Automatisk ber\u00e4kning av intrinsic Ground Risk Class baserat p\u00e5 UAS-dimensioner, operationshastighet och befolkningst\u00e4thet, enligt SORA v2.5 tabell\u00a02.',
-    'feat.arc.title':  'ARC-best\u00e4mning',
-    'feat.arc.desc':   'Air Risk Class fastst\u00e4lls fr\u00e5n luftrumsklass och h\u00f6jd. Fullt st\u00f6d f\u00f6r U-space-luftrum (EU\u00a02021/664), inklusive automatisk ARC-mitigering via U-space-tj\u00e4nster.',
-    'feat.oso.title':  'OSO-scoring',
-    'feat.oso.desc':   'Interaktiv bed\u00f6mning av samtliga 24 Operational Safety Objectives. Varje OSO \u00e4r kopplat till robusthetskriteriet (M/D/O) och tillr\u00e4cklighetsniv\u00e5 (Low\u00a0/\u00a0Medium\u00a0/\u00a0High\u00a0/\u00a0Very\u00a0High).',
-    'feat.cont.title': 'Containment',
-    'feat.cont.desc':  'Bed\u00f6mning av operationsvolym, contingency-zon och ground risk buffer. Fastst\u00e4ller GRC-mitigeringskredit baserat p\u00e5 vald inneslutningsstrategi.',
-    'feat.sail.title': 'SAIL & kategori',
-    'feat.sail.desc':  'Automatisk SAIL-best\u00e4mning fr\u00e5n GRC och ARC. Klassificerar operationen som \u00f6ppen, specifik (PDRA\u00a0/\u00a0STS\u00a0/\u00a0ConOps) eller certifierad kategori per EU\u00a02019/947.',
-    'feat.pdf.title':  'PDF-rapport',
-    'feat.pdf.desc':   'Genererar en strukturerad PDF-rapport \u00f6ver hela bed\u00f6mningen. Klar att bifogas tillst\u00e5ndsans\u00f6kan till Transportstyrelsen eller annan nationell CAA.',
-    'sora.label':      'SORA v2.5 Arbetsfl\u00f6de',
-    'sora.title':      'Hela processen,<br>ett steg i taget',
-    'sora.desc':       'MissionDesk implementerar SORA v2.5 (ED Decision 2025/018/R) fullst\u00e4ndigt \u2013 med abort-on-error pipeline som stoppar vid ogiltiga indata innan de sprids vidare.',
-    'sora.s1.name':    'Scenario',
-    'sora.s1.detail':  'UAS-modell, vingbredd, hastighet, operationstyp',
-    'sora.s2.detail':  'Intrinsic Ground Risk Class fr\u00e5n SORA tabell 2',
-    'sora.s3.name':    'Containment',
-    'sora.s3.detail':  'GRC-mitigering via inneslutningsstrategi',
-    'sora.s5.detail':  'Air Risk Class + U-space-mitigering',
-    'sora.s8.detail':  '24 Operational Safety Objectives',
-    'sora.s9.detail':  'Specific Assurance & Integrity Level + kategori',
-    'reg.label':       'Regulatorisk grund',
-    'reg.title':       'Byggt p\u00e5 korrekt<br>regelverk',
-    'reg.desc':        'Alla ber\u00e4kningar och fl\u00f6den \u00e4r verifierade mot aktuella EASA-dokument och EU-f\u00f6rordningar.',
-    'reg.tableTitle':  'Regulatoriska referenser',
-    'reg.col1':        'Referens',
-    'reg.col2':        'Dokument',
-    'reg.col3':        'Till\u00e4mpning',
-    'reg.r1.doc':      'Regler och f\u00f6rfaranden f\u00f6r UAS-operationer',
-    'reg.r1.app':      'Operationskategori, STS, PDRA, UAS.SPEC-krav',
-    'reg.r2.doc':      'UAS-design och tillverkning',
-    'reg.r2.app':      'UA-klasser C0\u2013C6, CE-m\u00e4rkning',
-    'reg.r3.doc':      'Specific Operations Risk Assessment',
-    'reg.r4.doc':      'AMC & GM till EU 2019/947',
-    'reg.r4.app':      'Detaljerade krav och v\u00e4gledning f\u00f6r SORA',
-    'reg.r5.doc':      'U-space regulatoriskt ramverk',
-    'reg.r5.app':      'U-space-luftrum, ARC-mitigering via U-space-tj\u00e4nster',
-    'reg.r6.doc':      'Critical Area Assessment Tool',
-    'reg.r6.app':      'GRC-modellering, Critical Area-ber\u00e4kning',
-    'dl.label':        'Nedladdning',
-    'dl.title':        'Ladda ned<br>MissionDesk',
-    'dl.latest':       'Senaste versionen',
-    'dl.beta':         'Beta-release',
-    'dl.free':         'Gratis att ladda ned och anv\u00e4nda. Ingen registrering kr\u00e4vs.',
-    'dl.winOnly':      'Applikationen finns i nul\u00e4get enbart f\u00f6r Windows. macOS och Linux planeras i en framtida version.',
-    'dl.btn':          'Ladda ned .exe',
-    'dl.allReleases':  'Alla versioner p\u00e5 GitHub \u2192',
-    'req.os.title':    'Operativsystem',
-    'req.os.detail':   'Windows 10 eller Windows 11 (64-bit). WebView2 Runtime medf\u00f6ljer i installationsprogrammet.',
-    'req.cpu.title':   'Processor',
-    'req.cpu.detail':  'Valfri x64-kompatibel processor. Inga specifika prestandakrav.',
-    'req.net.title':   'Internet',
-    'req.net.detail':  'Valfritt \u2013 kr\u00e4vs f\u00f6r luftrumskartan (OpenAIP API-nyckel) och METAR-data (CheckWX). Offline-l\u00e4ge st\u00f6ds.',
-    'req.key.title':   'API-nycklar',
-    'req.key.detail':  'OpenAIP och CheckWX API-nycklar konfigureras i appens inst\u00e4llningssida. Gratisplan finns hos b\u00e5da leverant\u00f6rerna.',
-    'footer.desc':     'Professionell UAS-uppdragsplanering f\u00f6r EU-operat\u00f6rer. Byggt f\u00f6r specifik kategori \u2013 med korrekt, verifierad implementering av SORA v2.5.',
+    'nav.features':'Funktioner','nav.sora':'SORA v2.5','nav.regulations':'Regelverk','nav.download':'Ladda ned',
+    'hero.line2':'Uppdragsplanering',
+    'hero.sub':'Strukturerad riskbed\u00f6mning och regulatorisk compliance f\u00f6r dr\u00f6noperationer i EU. Byggd f\u00f6r piloter och operat\u00f6rer i specifik kategori \u2013 med fullt st\u00f6d f\u00f6r SORA v2.5, EU\u00a02019/947 och U-space.',
+    'hero.cta':'Ladda ned gratis','hero.secondary':'Utforska funktioner \u2192',
+    'mock.wingspan':'UAS-vingbredd','mock.speed':'Operationshastighet','mock.pop':'Befolkningst\u00e4thet','mock.controlled':'Kontrollerat omr\u00e5de','mock.airspace':'Luftrumsklass',
+    'feat.label':'Funktioner','feat.title':'Allt du beh\u00f6ver<br>f\u00f6r specifik kategori',
+    'feat.desc':'MissionDesk guidar dig steg f\u00f6r steg genom hela SORA-bed\u00f6mningen, uppdragsbriefingen och f\u00f6rflygningsf\u00f6rberedelserna \u2013 fr\u00e5n iGRC till slutlig SAIL-klassificering och PDF-rapport.',
+    'feat.igrc.title':'iGRC-ber\u00e4kning','feat.igrc.desc':'Automatisk ber\u00e4kning av intrinsic Ground Risk Class baserat p\u00e5 UAS-dimensioner, operationshastighet och befolkningst\u00e4thet, enligt SORA v2.5 tabell\u00a02.',
+    'feat.arc.title':'ARC-best\u00e4mning','feat.arc.desc':'Air Risk Class fastst\u00e4lls fr\u00e5n luftrumsklass och h\u00f6jd. Fullt st\u00f6d f\u00f6r U-space-luftrum (EU\u00a02021/664), inklusive automatisk ARC-mitigering via U-space-tj\u00e4nster.',
+    'feat.oso.title':'OSO-scoring','feat.oso.desc':'Interaktiv bed\u00f6mning av samtliga 24 Operational Safety Objectives. Varje OSO \u00e4r kopplat till robusthetskriteriet (M/D/O) och tillr\u00e4cklighetsniv\u00e5 (Low\u00a0/\u00a0Medium\u00a0/\u00a0High\u00a0/\u00a0Very\u00a0High).',
+    'feat.cont.title':'Containment','feat.cont.desc':'Bed\u00f6mning av operationsvolym, contingency-zon och ground risk buffer. Fastst\u00e4ller GRC-mitigeringskredit baserat p\u00e5 vald inneslutningsstrategi.',
+    'feat.import.title':'Importera uppdrag','feat.import.desc':'Importera uppdragsfiler direkt fr\u00e5n ArduPilot Mission Planner eller Litchi. MissionDesk anv\u00e4nder waypoint-datan som underlag f\u00f6r hela riskbed\u00f6mningen och briefingen.',
+    'feat.brief.title':'F\u00f6rflygningsbriefing','feat.brief.desc':'Genererar en komplett f\u00f6rflygningsbriefing med aktuellt METAR\u00a0/\u00a0TAF-v\u00e4der, NOTAM och radiofrekvenser till flygplatser l\u00e4ngs den planerade rutten.',
+    'feat.sail.title':'SAIL & kategori','feat.sail.desc':'Automatisk SAIL-best\u00e4mning fr\u00e5n GRC och ARC. Klassificerar operationen som \u00f6ppen, specifik (PDRA\u00a0/\u00a0STS\u00a0/\u00a0ConOps) eller certifierad kategori per EU\u00a02019/947.',
+    'feat.pdf.title':'PDF-rapport','feat.pdf.desc':'Genererar en strukturerad PDF-rapport \u00f6ver hela bed\u00f6mningen och briefingen. Klar att bifogas tillst\u00e5ndsans\u00f6kan till Transportstyrelsen eller annan nationell CAA.',
+    'sora.label':'SORA v2.5 Arbetsfl\u00f6de','sora.title':'Hela processen,<br>ett steg i taget',
+    'sora.desc':'MissionDesk implementerar SORA v2.5 (ED Decision 2025/018/R) fullst\u00e4ndigt \u2013 med abort-on-error pipeline som stoppar vid ogiltiga indata innan de sprids vidare.',
+    'sora.s1.name':'Scenario','sora.s1.detail':'UAS-modell, vingbredd, hastighet, operationstyp',
+    'sora.s2.detail':'Intrinsic Ground Risk Class fr\u00e5n SORA tabell 2',
+    'sora.s3.name':'Containment','sora.s3.detail':'GRC-mitigering via inneslutningsstrategi',
+    'sora.s5.detail':'Air Risk Class + U-space-mitigering',
+    'sora.s8.detail':'24 Operational Safety Objectives',
+    'sora.s9.detail':'Specific Assurance & Integrity Level + kategori',
+    'reg.label':'Regulatorisk grund','reg.title':'Byggt p\u00e5 korrekt<br>regelverk',
+    'reg.desc':'Alla ber\u00e4kningar och fl\u00f6den \u00e4r verifierade mot aktuella EASA-dokument och EU-f\u00f6rordningar.',
+    'reg.tableTitle':'Regulatoriska referenser','reg.col1':'Referens','reg.col2':'Dokument','reg.col3':'Till\u00e4mpning',
+    'reg.r1.doc':'Regler och f\u00f6rfaranden f\u00f6r UAS-operationer','reg.r1.app':'Operationskategori, STS, PDRA, UAS.SPEC-krav',
+    'reg.r2.doc':'UAS-design och tillverkning','reg.r2.app':'UA-klasser C0\u2013C6, CE-m\u00e4rkning',
+    'reg.r3.doc':'Specific Operations Risk Assessment',
+    'reg.r4.doc':'AMC & GM till EU 2019/947','reg.r4.app':'Detaljerade krav och v\u00e4gledning f\u00f6r SORA',
+    'reg.r5.doc':'U-space regulatoriskt ramverk','reg.r5.app':'U-space-luftrum, ARC-mitigering via U-space-tj\u00e4nster',
+    'reg.r6.doc':'Critical Area Assessment Tool','reg.r6.app':'GRC-modellering, Critical Area-ber\u00e4kning',
+    'dl.label':'Nedladdning','dl.title':'Ladda ned<br>MissionDesk','dl.latest':'Senaste versionen',
+    'dl.beta':'Beta-release','dl.free':'Gratis att ladda ned och anv\u00e4nda. Ingen registrering kr\u00e4vs.',
+    'dl.winOnly':'Applikationen finns i nul\u00e4get enbart f\u00f6r Windows. macOS och Linux planeras i en framtida version.',
+    'dl.btn':'Ladda ned .exe','dl.allReleases':'Alla versioner p\u00e5 GitHub \u2192',
+    'req.os.title':'Operativsystem','req.os.detail':'Windows 10 eller Windows 11 (64-bit). WebView2 Runtime medf\u00f6ljer i installationsprogrammet.',
+    'req.cpu.title':'Processor','req.cpu.detail':'Valfri x64-kompatibel processor. Inga specifika prestandakrav.',
+    'req.net.title':'Internet','req.net.detail':'Valfritt \u2013 kr\u00e4vs f\u00f6r luftrumskartan (OpenAIP API-nyckel) och METAR\u00a0/\u00a0TAF-v\u00e4derdata (CheckWX). Offline-l\u00e4ge st\u00f6ds.',
+    'req.key.title':'API-nycklar','req.key.detail':'OpenAIP och CheckWX API-nycklar konfigureras i appens inst\u00e4llningssida. Gratisplan finns hos b\u00e5da leverant\u00f6rerna.',
+    'footer.desc':'Professionell UAS-uppdragsplanering f\u00f6r EU-operat\u00f6rer. Byggt f\u00f6r specifik kategori \u2013 med korrekt, verifierad implementering av SORA v2.5.',
   }
 };
 
-/* ═══════════════════════════════════════════════════
-   LANGUAGE SWITCHING
-═══════════════════════════════════════════════════ */
+/* ═══ LANGUAGE ═══ */
 let currentLang = localStorage.getItem('md_lang') || 'en';
-
 function applyLang(lang) {
   currentLang = lang;
   localStorage.setItem('md_lang', lang);
   document.documentElement.lang = lang === 'sv' ? 'sv' : 'en-GB';
   document.documentElement.dataset.lang = lang;
-
-  // Flag shows the OTHER language (clicking switches to it)
   document.getElementById('langFlag').textContent = lang === 'en' ? '\uD83C\uDDF8\uD83C\uDDEA' : '\uD83C\uDDEC\uD83C\uDDE7';
-
   const strings = i18n[lang];
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.dataset.i18n;
-    if (strings[key] !== undefined) {
-      el.innerHTML = strings[key];
-    }
+    const v = strings[el.dataset.i18n];
+    if (v !== undefined) el.innerHTML = v;
   });
-
-  // Hero badge version text (keep version number intact)
   const badge = document.getElementById('heroBadge');
-  const vb = document.getElementById('versionBadge');
   if (badge) {
-    const ver = badge.textContent.split('·')[0].trim();
-    badge.textContent = ver + ' · SORA v2.5 ' + (lang === 'sv' ? 'Kompatibel' : 'Compliant');
+    const ver = badge.textContent.split('\u00b7')[0].trim();
+    badge.textContent = ver + ' \u00b7 SORA v2.5 ' + (lang === 'sv' ? 'Kompatibel' : 'Compliant');
   }
 }
+document.getElementById('langToggle').addEventListener('click', () => applyLang(currentLang === 'en' ? 'sv' : 'en'));
 
-document.getElementById('langToggle').addEventListener('click', () => {
-  applyLang(currentLang === 'en' ? 'sv' : 'en');
-});
-
-/* ═══════════════════════════════════════════════════
-   THEME SWITCHING
-═══════════════════════════════════════════════════ */
-const savedTheme = localStorage.getItem('md_theme') || 'dark';
-document.documentElement.dataset.theme = savedTheme;
-
+/* ═══ THEME ═══ */
+(function() { const s = localStorage.getItem('md_theme'); if (s) document.documentElement.dataset.theme = s; })();
 document.getElementById('themeToggle').addEventListener('click', () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
   localStorage.setItem('md_theme', next);
 });
 
-/* ═══════════════════════════════════════════════════
-   GITHUB RELEASES API – fetch latest version & update link
-═══════════════════════════════════════════════════ */
+/* ═══ GITHUB RELEASES API ═══ */
 async function fetchLatestRelease() {
-  const badge  = document.getElementById('versionBadge');
-  const dlBtn  = document.getElementById('dlBtn');
-  const dlVer  = document.getElementById('dlVersion');
+  const badge = document.getElementById('versionBadge');
+  const dlBtn = document.getElementById('dlBtn');
+  const dlVer = document.getElementById('dlVersion');
   const heroBadgeEl = document.getElementById('heroBadge');
-
   try {
-    const res  = await fetch('https://api.github.com/repos/tevekanna/MissionDesk/releases/latest');
-    if (!res.ok) throw new Error('not found');
+    const res = await fetch('https://api.github.com/repos/tevekanna/missiondesk.se/releases/latest');
+    if (!res.ok) throw new Error('no release');
     const data = await res.json();
-
-    const tag  = data.tag_name || '';                  // e.g. "v3.0.0"
-    const ver  = tag.replace(/^v/, '');                // "3.0.0"
-
-    // Find the .exe asset
-    const asset = (data.assets || []).find(a => a.name.endsWith('.exe'));
+    const tag = data.tag_name || '';
+    const ver = tag.replace(/^v/, '');
+    const asset = (data.assets || []).find(a => a.name.toLowerCase().endsWith('.exe'));
     const dlUrl = asset
       ? asset.browser_download_url
-      : `https://github.com/tevekanna/MissionDesk/releases/latest/download/MissionDesk_${ver}_x64-setup.exe`;
-
-    // Update UI
-    if (dlVer)  dlVer.textContent  = 'MissionDesk v' + ver;
-    if (dlBtn)  dlBtn.href          = dlUrl;
+      : `https://github.com/tevekanna/missiondesk.se/releases/latest/download/MissionDesk_${ver}_x64-setup.exe`;
+    if (dlVer) dlVer.textContent = 'MissionDesk v' + ver;
+    if (dlBtn) dlBtn.href = dlUrl;
     if (badge) {
-      const sz = asset ? ' · ' + (asset.size / 1024 / 1024).toFixed(1) + ' MB' : '';
+      const sz = asset ? ' \u00b7 ' + (asset.size / 1024 / 1024).toFixed(1) + '\u00a0MB' : '';
       badge.textContent = tag + sz;
     }
     if (heroBadgeEl) {
-      heroBadgeEl.textContent = tag + ' · SORA v2.5 ' +
-        (currentLang === 'sv' ? 'Kompatibel' : 'Compliant');
+      heroBadgeEl.textContent = tag + ' \u00b7 SORA v2.5 ' + (currentLang === 'sv' ? 'Kompatibel' : 'Compliant');
     }
   } catch {
-    // Fallback: keep defaults already in HTML
-    if (badge) badge.textContent = 'v3.0.0';
+    if (badge) badge.textContent = 'v3.109';
   }
 }
 
-/* ═══════════════════════════════════════════════════
-   SCROLL REVEAL
-═══════════════════════════════════════════════════ */
-const revealObs = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObs.unobserve(e.target); } });
+/* ═══ SCROLL REVEAL ═══ */
+const ro = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
 }, { threshold: 0.08 });
-document.querySelectorAll('[data-reveal]').forEach(el => revealObs.observe(el));
+document.querySelectorAll('[data-reveal]').forEach(el => ro.observe(el));
 
-/* ═══════════════════════════════════════════════════
-   SMOOTH SCROLL
-═══════════════════════════════════════════════════ */
+/* ═══ SMOOTH SCROLL ═══ */
 document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', e => {
     const t = document.querySelector(a.getAttribute('href'));
@@ -1004,9 +775,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   });
 });
 
-/* ═══════════════════════════════════════════════════
-   INIT
-═══════════════════════════════════════════════════ */
+/* ═══ INIT ═══ */
 applyLang(currentLang);
 fetchLatestRelease();
 </script>
