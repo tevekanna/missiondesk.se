@@ -1,0 +1,15 @@
+{
+  "name": "MissionDesk",
+  "short_name": "MissionDesk",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0069b4",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Eo_circle_blue_white_letter-d.svg/512px-Eo_circle_blue_white_letter-d.svg.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

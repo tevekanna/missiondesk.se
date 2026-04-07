@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MissionDesk – EASA SORA UAS Operations Briefing System</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&family=Barlow+Semi+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <button id="sidebar-toggle-btn" class="dbrf-btn theme-btn" onclick="window.toggleSidebar()" title="Toggle Navigation" style="margin-right:8px; padding:6px 10px; font-size:16px;">☰</button>
+    <a href="/" title="Back to missiondesk.se" style="
+      display:inline-flex; align-items:center; gap:5px;
+      font-family:var(--mono); font-size:9px; font-weight:bold;
+      letter-spacing:0.1em; text-transform:uppercase;
+      color:var(--muted); text-decoration:none;
+      border:1px solid var(--border); border-radius:3px;
+      padding:4px 8px; margin-right:8px;
+      transition:color 0.2s, border-color 0.2s;
+      white-space:nowrap;"
+      onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'"
+      onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
+      ← missiondesk.se
+    </a>
+    <div class="logo-icon">
+      <svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1" id="svg1" xmlns="http://www.w3.org/2000/svg">
+        <circle style="fill:none;stroke:#009800;stroke-width:15" cx="105.99871" cy="144.45354" r="61.5172" />
+        <g transform="matrix(1.0896014,0,0,1.0896014,-8.5270697,12.568564)">
+          <path style="fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-width:3.104" d="M 106.32814,36.266065 154.76495,201.43573 106.32814,157.84257 Z" />
+          <path style="fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-width:3.104" d="M 103.8878,36.266065 55.450972,201.43573 103.8878,157.84257 Z" />
+        </g>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">Mission<span>Desk</span></div>
+    </div>
+  </div>
+  
+  <div style="flex:1; padding: 0 24px; min-width: 0; display: flex; align-items: center;">
+    <span id="header-mission-name" style="font-family: var(--mono); font-size: 10px; font-weight: bold; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 1px;"></span>
+  </div>
+  
+  <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0;">
+    <div class="dbrf-bar">
+      <span class="dbrf-status" id="dbrf-status" style="margin-right:8px; text-align:right;"></span>
+      <button class="dbrf-btn dbrf-btn-new" onclick="window.dbrfNewPlan()" title="Start a new MissionDesk plan">📄 NEW PLAN</button>
+      <input type="file" id="dbrf-open-input" accept=".dbrf" style="display:none;" onchange="dbrfLoad(this)">
+      <button class="dbrf-btn dbrf-btn-open" onclick="document.getElementById('dbrf-open-input').click()" title="Open a saved MissionDesk plan (.dbrf)">📂 OPEN PLAN</button>
+      <button class="dbrf-btn dbrf-btn-save" onclick="dbrfSave()" title="Save current plan as .dbrf file">💾 SAVE PLAN</button>
+    </div>
+
+    <div style="width: 1px; height: 24px; background: var(--border);"></div>
+
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="header-badge">EASA SORA v2.5</div>
+      <div class="header-badge" style="border-color: var(--muted); color: var(--muted);" id="app-version">{{APP_VERSION}}</div>
+      <button id="theme-toggle-btn" class="dbrf-btn theme-btn" onclick="toggleTheme()" title="Toggle Light/Dark Theme">☀️</button>
+    </div>
+  </div>
+</header>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <nav class="step-nav vertical">
+      <button class="step-btn active" onclick="goTo(0)"><span class="step-num">01</span>DOI / ConOps</button>
+      <button class="step-btn" onclick="goTo(1)"><span class="step-num">02</span>VOLUME PLAN</button>
+      <button class="step-btn" onclick="goTo(2)"><span class="step-num">03–07</span>GRC·ARC·SAIL<span id="stale-warn-sail" class="stale-warn" style="display:none;" title="Data has changed. Click here to update the SORA calculation.">⚠</span></button>
+      <button class="step-btn" onclick="goTo(3)"><span class="step-num">08</span>CONTAINMENT</button>
+      <button class="step-btn" onclick="goTo(4)"><span class="step-num">09</span>OSO</button>
+      <button class="step-btn" onclick="goTo(5)"><span class="step-num">WEATHER</span>AIRSPACE</button>
+      <button class="step-btn" onclick="goTo(6)"><span class="step-num">CONT.</span>PROC.</button>
+      <button class="step-btn" onclick="goTo(7)"><span class="step-num">TEM</span>THREATS</button>
+      <button class="step-btn" onclick="goTo(8)"><span class="step-num">10</span>CHARTS</button>
+      <button class="step-btn" onclick="window.generateBriefing(); goTo(9)"><span class="step-num">11</span>BRIEFING</button>
+      <button class="step-btn" onclick="window.generateOFP(); goTo(10)"><span class="step-num">OFP</span>FLIGHT PLAN</button>
+
+      <div style="margin-top: auto; border-top: 1px solid var(--border); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-family:var(--mono); font-size:10px; color:var(--muted); font-weight:bold; letter-spacing:1px;">TEXT SIZE</span>
+        <div style="display:flex; gap:6px;">
+          <button onclick="window.adjustTextSize(-1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">-</button>
+          <button onclick="window.adjustTextSize(1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">+</button>
+        </div>
+      </div>
+      <button class="step-btn" onclick="window.openUrl('https://forms.gle/rgJdKVip1NUxTFjs9')" style="border-top: 1px solid var(--border);">
+        <span class="step-num">💬</span>FEEDBACK
+      </button>
+      <button class="step-btn coffee-btn" onclick="window.openUrl('https://buymeacoffee.com/MissionDesk')">
+        <span class="step-num">🍺</span>BUY ME A COFFEE
+      </button>
+      <button class="step-btn" onclick="goTo(11)" style="border-top: 1px solid var(--border);">
+        <span class="step-num">⚙</span>SETTINGS
+      </button>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    
+    <div class="panel active" id="panel-0">
+      <div class="panel-title">Step 1 – Detailed Operational Information (DOI)</div>
+      <div class="panel-sub">// SORA 2.5 STEP #1 · FORMERLY "ConOps" · BASED ON ANNEX A TEMPLATE</div>
+
+      <div class="info-box">
+        In SORA 2.5, the concept of <strong>ConOps</strong> has been replaced by <strong>Detailed Operational Information (DOI)</strong>.
+        DOI is the structured information baseline that underpins all subsequent risk assessment steps (Annex A, ED Decision 2025/018/R).
+        Fill in the essential information below. <strong>Expand <em>Full ConOps</em> if you wish to add a complete operational description.</strong>
+      </div>
+
+      <div style="background:var(--surface2); border:1px solid var(--accent);border-radius:6px;padding:16px 20px;margin-bottom:20px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:bold;
+          letter-spacing:1px;margin-bottom:8px;">⚡ QUICK LOAD – MISSION FILES</div>
+        <div style="font-family:var(--mono); font-size:calc(11px + var(--tz)); color:var(--muted); margin-bottom:12px; line-height:1.6;">
+          Upload ArduPilot mission files to automatically populate waypoints, calculate flight time and energy.
+          Formats: <strong>QGC WPL 110</strong> (.waypoints) · <strong>QGC Plan</strong> (.plan) · Litchi CSV
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input type="file" id="ql-mission-input" accept=".waypoints,.plan,.txt,.mission,.csv"
+            style="display:none;" onchange="quickLoadMission(this)">
+          <input type="file" id="ql-fence-input" accept=".waypoints,.plan,.txt,.fence"
+            style="display:none;" onchange="quickLoadFence(this)">
+          <input type="file" id="ql-rally-input" accept=".waypoints,.txt,.rally"
+            style="display:none;" onchange="quickLoadRally(this)">
+          <button onclick="document.getElementById('ql-mission-input').click()" class="btn btn-secondary" style="border-color:var(--accent); color:var(--accent); padding:10px 18px; font-size:11px;">📂 MISSION FILE (.waypoints)</button>
+          <button onclick="document.getElementById('ql-fence-input').click()" class="btn btn-secondary" style="border-color:var(--accent2); color:var(--accent2); padding:10px 18px; font-size:11px;">🔶 FENCE FILE (.waypoints)</button>
+          <button onclick="document.getElementById('ql-rally-input').click()" class="btn btn-secondary" style="border-color:var(--ok); color:var(--ok); padding:10px 18px; font-size:11px;">🟢 RALLY POINTS (.waypoints)</button>
+          <button onclick="clearQuickLoad()" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:10px 14px; font-size:11px;">✕ CLEAR ALL</button>
+        </div>
+        <div id="ql-status" style="margin-top:10px;font-family:var(--mono);font-size:10px;
+          color:var(--muted);line-height:1.9;min-height:16px;white-space:pre-line;"></div>
+      </div>
+      <div class="section-label">▸ A1 – IDENTIFICATION</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Mission Name <span class="req-star">★</span></label>
+          <input type="text" id="mission-name" placeholder="e.g. Site Survey Alpha – Tower 3" style="font-weight:bold;">
+        </div>
+        <div class="field" style="grid-column: span 2;">
+          <label>Mission Description</label>
+          <textarea id="mission-desc" class="auto-expand" rows="1" placeholder="Brief description of the UAS operation and its objective"></textarea>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Operator / Organisation <span class="req-star">★</span></label>
+          <input type="text" id="op-name" placeholder="Name or company">
+        </div>
+        <div class="field">
+          <label>Pilot Flying (PF)<span class="req-star">★</span></label>
+          <input type="text" id="pilot-name" placeholder="Remote Pilot-in-Command (RPIC)">
+        </div>
+        <div class="field">
+          <label>Pilot Monitoring (PM)</label>
+          <input type="text" id="pilot-monitor" placeholder="Remote Pilot Monitoring / second crew member">
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Date (ISO 8601) <span class="req-star">★</span></label>
+          <input type="text" id="op-date" placeholder="YYYY-MM-DD" maxlength="10" style="font-family:var(--mono);letter-spacing:1px;" oninput="window.formatDateInput(this)">
+        </div>
+        <div class="field">
+          <label>Planned departure time (UTC)</label>
+          <input type="time" id="op-time" placeholder="10:00"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Coordinated Universal Time (UTC / Zulu)</div>
+        </div>
+        <div class="field">
+          <label>Estimated flight time (min)</label>
+          <input type="number" id="op-duration" placeholder="30" min="1"
+            style="background:var(--surface2);" title="Auto-calculated – may also be edited manually" lang="en">
+          <div id="duration-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Auto-calculated from waypoints and cruise speed</div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ A2 – UAS CHARACTERISTICS (SORA 2.5 QUANTITATIVE GRC)</div>
+      <div class="info-box">
+        SORA 2.5 replaces MTOM-based GRC with <strong>characteristic dimension (m)</strong> and <strong>max speed (m/s)</strong> as primary parameters (Annex F, Table 2).
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+        <label>UAS / Model <span class="req-star">★</span></label>
+        <div style="position:relative;">
+          <input type="text" id="drone-model" placeholder="e.g. DJI Mavic 3" autocomplete="off"
+            onfocus="window.showDroneSuggestions(this.value)"
+            onclick="window.showDroneSuggestions(this.value)"
+            oninput="window.droneLookupDebounced(this.value)" 
+            onblur="setTimeout(window.hideDroneSuggestions,250)">
+          <div id="drone-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:99;
+            background:var(--surface);border:1px solid var(--accent);border-radius:3px;box-shadow:0 4px 16px rgba(0,0,0,0.15);max-height:250px;overflow-y:auto;"></div>
+        </div>
+        <div id="drone-lookup-status" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;min-height:12px;"></div>
+      </div>
+        <div class="field">
+          <label>Characteristic dimension (m) ★</label>
+          <input type="number" id="drone-dim" placeholder="0.6" step="0.01" min="0" oninput="updateDimHint()" inputmode="decimal" lang="en">
+          <div id="dim-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Largest dimension (diagonal for multirotor)</div>
+        </div>
+        <div class="field">
+          <label>Maximum airspeed (m/s) ★</label>
+          <input type="number" id="drone-speed" placeholder="15" step="0.5" min="0" lang="en">
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Cruise speed (m/s) – for flight time calculation</label>
+          <input type="number" id="drone-cruise" placeholder="10" step="0.5" min="0.5" value="10"
+            oninput="recalcFlightTime()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Default 10 m/s. Used to calculate flight time from waypoints.</div>
+        </div>
+        <div class="field">
+          <label>Dwell time per waypoint (s)</label>
+          <input type="number" id="drone-wp-dwell" placeholder="0" step="1" min="0" value="0"
+            oninput="recalcFlightTime()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Hover/dwell time per waypoint (hover, photo etc). Default 0 s.</div>
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button class="btn btn-secondary" onclick="recalcFlightTime()" style="width:100%;font-size:11px;padding:10px; color:var(--accent); border-color:var(--accent);">
+            ⏱ CALCULATE FLIGHT TIME
+          </button>
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>MTOM (kg) – for reference</label>
+          <input type="number" id="drone-mtom" placeholder="0.9" step="0.1" min="0" inputmode="decimal" lang="en">
+        </div>
+        <div class="field">
+          <label>Remote ID active</label>
+          <select id="drone-rid">
+            <option value="yes">Yes – EU Remote ID</option>
+            <option value="no">No</option>
+            <option value="na">Not applicable</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>UA class (EU)</label>
+          <select id="drone-class">
+            <option value="C0">C0 (&lt;250g)</option>
+            <option value="C1">C1 (&lt;900g)</option>
+            <option value="C2">C2 (&lt;4kg)</option>
+            <option value="C3">C3 (&lt;25kg)</option>
+            <option value="C4">C4 (&lt;25kg legacy)</option>
+            <option value="other">Other / custom-built</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label">▸ A2b – ENERGY CALCULATION & BATTERY BUDGET</div>
+      <div class="info-box">
+        Energy consumption per flight phase as <strong>% of total battery per minute</strong>.
+        Values are <strong>pre-filled from the UAS database</strong> when you select a model above — adjust to match your actual experience.
+      </div>
+
+      <div id="nrg-source-banner" style="display:none;margin-bottom:10px;padding:8px 12px;
+        background:var(--surface2);border:1px solid var(--accent);border-radius:4px;
+        font-family:var(--mono);font-size:9px;color:var(--accent);display:flex;align-items:flex-start;gap:8px;">
+        <span style="flex-shrink:0;font-size:11px;">ℹ</span>
+        <span id="nrg-source-text"></span>
+        <button onclick="nrgResetToDefaults()" title="Reset to default values"
+          style="margin-left:auto;flex-shrink:0;background:none;border:1px solid var(--accent);
+          color:var(--accent);font-family:var(--mono);font-size:9px;padding:2px 8px;cursor:pointer;border-radius:2px;">
+          ↺ RESET
+        </button>
+      </div>
+
+      <div class="form-grid four">
+        <div class="field">
+          <label>Setup / arming (% tot)
+            <span id="nrg-setup-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-setup" placeholder="2" step="0.5" min="0" max="20" value="2"
+            oninput="nrgMarkEdited('nrg-setup');recalcEnergy()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Fixed overhead before take-off</div>
+        </div>
+        <div class="field">
+          <label>Take-off / climb (%/min)
+            <span id="nrg-takeoff-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-takeoff" placeholder="5" step="0.5" min="0" max="50" value="5"
+            oninput="nrgMarkEdited('nrg-takeoff');recalcEnergy()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">High power — vertical ascent phase</div>
+        </div>
+        <div class="field">
+          <label>Cruise (%/min)
+            <span id="nrg-cruise-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-cruise" placeholder="3" step="0.5" min="0" max="30" value="3"
+            oninput="nrgMarkEdited('nrg-cruise');recalcEnergy()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Horizontal cruise phase</div>
+        </div>
+        <div class="field">
+          <label>Descent / landing (%/min)
+            <span id="nrg-descent-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-descent" placeholder="2.5" step="0.5" min="0" max="30" value="2.5"
+            oninput="nrgMarkEdited('nrg-descent');recalcEnergy()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Lower power — descent phase</div>
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Take-off phase (min)
+            <span id="nrg-takeoff-min-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-takeoff-min" placeholder="1.5" step="0.5" min="0" value="1.5"
+            oninput="nrgMarkEdited('nrg-takeoff-min');recalcEnergy()" inputmode="decimal" lang="en">
+        </div>
+        <div class="field">
+          <label>Descent phase (min)
+            <span id="nrg-descent-min-badge" style="display:none;margin-left:6px;font-size:8px;padding:1px 5px;
+              background:rgba(0,105,180,0.10);color:var(--accent);border-radius:2px;font-weight:400;
+              font-family:var(--mono);">DB</span>
+          </label>
+          <input type="number" id="nrg-descent-min" placeholder="1.5" step="0.5" min="0" value="1.5"
+            oninput="nrgMarkEdited('nrg-descent-min');recalcEnergy()" inputmode="decimal" lang="en">
+        </div>
+        <div class="field">
+          <label>Reserve margin (%)</label>
+          <input type="number" id="nrg-reserve" placeholder="20" step="5" min="0" max="50" value="20"
+            oninput="recalcEnergy()" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Recommended ≥20% (RTL margin)</div>
+        </div>
+      </div>
+
+      <div id="nrg-result" style="display:none;margin-top:10px;padding:14px 18px;
+        background:var(--surface);border:1px solid var(--border);border-radius:5px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);
+          letter-spacing:1px;margin-bottom:10px;">ENERGY BUDGET ESTIMATE</div>
+
+        <div style="margin-bottom:10px;">
+          <div id="nrg-bar" style="display:flex;height:20px;border-radius:3px;overflow:hidden;border:1px solid var(--border);"></div>
+          <div id="nrg-legend" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-family:var(--mono);font-size:9px;"></div>
+        </div>
+
+        <div id="nrg-summary" style="font-family:var(--mono);font-size:11px;line-height:2;"></div>
+
+        <div id="nrg-warning" style="display:none;margin-top:8px;padding:8px 12px;
+          background:rgba(255,68,68,0.1);border:1px solid var(--danger);border-radius:3px;
+          font-family:var(--mono);font-size:11px;color:var(--danger);"></div>
+      </div>
+      <div class="section-label">▸ A3 – OPERATION CATEGORY & FLIGHT REGIME</div>
+      <div class="field" style="margin-bottom:16px;">
+        <label>Category</label>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-a1" value="A1">
+            <label for="cat-a1">Open A1<br><small>MTOM &lt;250g</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-a2" value="A2">
+            <label for="cat-a2">Open A2<br><small>250g–4kg</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-a3" value="A3">
+            <label for="cat-a3">Open A3<br><small>Up to 25 kg</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-sts1" value="STS-01">
+            <label for="cat-sts1">STS-01<br><small>VLOS controlled</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-sts2" value="STS-02">
+            <label for="cat-sts2">STS-02<br><small>BVLOS low exposure</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-specific" value="SPECIFIC">
+            <label for="cat-specific">Specific / SORA<br><small>Full risk assessment</small></label>
+          </div>
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Flight regime (LOS)</label>
+          <select id="op-los">
+            <option value="VLOS">VLOS</option>
+            <option value="EVLOS">EVLOS</option>
+            <option value="BVLOS">BVLOS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Operation type</label>
+          <select id="op-type" onchange="handleOpTypeChange()">
+            <option value="foto">Photo / Video</option>
+            <option value="inspektion">Infrastructure inspection</option>
+            <option value="lantmatning">Survey / Mapping</option>
+            <option value="leverans">Cargo / Delivery</option>
+            <option value="overvakning">Surveillance / Monitoring</option>
+            <option value="SAR">SAR / Emergency response</option>
+            <option value="annan">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Flight category</label>
+          <select id="op-flighttype" onchange="handleFlightTypeChange()">
+            <option value="standard">Standard flight</option>
+            <option value="autonomt">Autonomous / Waypoint</option>
+            <option value="svarm">Swarm</option>
+            <option value="dag">Daytime</option>
+            <option value="natt">Night flight</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label">▸ A4 – OPERATIONS VOLUME & LOCATION</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Location / address</label>
+          <input type="text" id="op-location" placeholder="e.g. Bristol, Portishead Dock">
+        </div>
+        <div class="field">
+          <label>GPS / coordinates</label>
+          <input type="text" id="op-coords" placeholder="57.7089° N, 11.9746° E  or  55°41'12.7&quot;N 13°19'04.1&quot;E">
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Max altitude AGL (m)</label>
+          <input type="number" id="op-alt" placeholder="50" min="0" inputmode="decimal" lang="en">
+        </div>
+        <div class="field">
+          <label>Operating radius / volume (m)</label>
+          <input type="number" id="op-radius" placeholder="200" min="0" inputmode="decimal" lang="en">
+        </div>
+        <div class="field">
+          <label>Contingency volume / buffer (m)</label>
+          <input type="number" id="op-buffer" placeholder="50" min="0" inputmode="decimal" lang="en">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Ground risk buffer (SORA 2.5 §2.2.4)</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Adjacent area – description</label>
+          <textarea id="op-adjacent" class="auto-expand" rows="1" placeholder="e.g. 200m public park, 500m residential area to the west"></textarea>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Adjacent area (SORA 2.5 §2.2.5) – used in containment step 8</div>
+        </div>
+        <div class="field">
+          <label>Adjacent airspace – description</label>
+          <textarea id="op-adj-air" class="auto-expand" rows="1" placeholder="e.g. CTR EGKK 5km east, no TMZ"></textarea>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Adjacent airspace (SORA 2.5 §2.2.6)</div>
+        </div>
+      </div> <div id="delivery-section" style="display:none;">
+        <div class="section-label">▸ A4b – DELIVERY ROUTE (START & DESTINATION)</div>
+        <div class="info-box" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <span>Delivery and transport operations require coordinates for <strong>start point</strong> and <strong>destination</strong>.
+          Flight distance calculated automatically. Map updates as you enter coordinates.</span>
+          <button onclick="window.autoFillDeliveryCoords()"
+            class="btn btn-secondary"
+            style="border-color:var(--accent);color:var(--accent);padding:6px 12px;font-size:10px;"
+            title="Fill start/destination from loaded mission file (first and last waypoint)">
+            ✈ FROM MISSION FILE
+          </button>
+        </div>
+        <div id="delivery-autofill-status" style="display:none;font-family:var(--mono);font-size:9px;
+          padding:6px 10px;border-radius:3px;margin-bottom:6px;"></div>
+        <div class="form-grid">
+          <div class="field">
+            <label>📍 Start point – location / address</label>
+            <input type="text" id="delivery-start-loc" placeholder="e.g. Royal Infirmary, Level 3 rooftop">
+          </div>
+          <div class="field">
+            <label>📍 Start point – coordinates</label>
+            <input type="text" id="delivery-start-coords" placeholder="57.7089° N, 11.9746° E" oninput="window.updateDeliveryMap();window.calcDeliveryDistance();window.recalcFlightTime()">
+            <div id="delivery-start-coords-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;display:none;"></div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>🏁 Destination – location / address</label>
+            <input type="text" id="delivery-dest-loc" placeholder="e.g. Hospital emergency entrance">
+          </div>
+          <div class="field">
+            <label>🏁 Destination – coordinates</label>
+            <input type="text" id="delivery-dest-coords" placeholder="57.6823° N, 11.9724° E" oninput="window.updateDeliveryMap();window.calcDeliveryDistance();window.recalcFlightTime()">
+            <div id="delivery-dest-coords-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;display:none;"></div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Payload / delivery item</label>
+            <input type="text" id="delivery-payload" placeholder="e.g. Blood sample 50g, temperature-sensitive">
+          </div>
+          <div class="field">
+            <label>Route distance (m) – auto-calculated</label>
+            <input type="number" id="delivery-distance" placeholder="Auto" min="0" style="background:var(--surface2);" inputmode="decimal" lang="en">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;" id="delivery-dist-hint">Fill in coordinates above for auto-calculation</div>
+          </div>
+        </div>
+        <div class="form-grid full">
+          <div class="field">
+            <label>Route description</label>
+            <textarea id="delivery-route" class="auto-expand" rows="1" placeholder="e.g. South along river corridor, climb to 80m AGL after take-off, maintaining 75m tills 200m from destination..."></textarea>
+          </div>
+        </div>
+        <div id="delivery-map-preview" style="margin-top:12px;">
+          <div class="map-link-bar" id="delivery-map-links" style="display:none;"></div>
+          <div class="leaflet-map-box" id="delivery-leaflet-map" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div id="waypoint-section" style="display:none;">
+        <div class="section-label">▸ A4c – WAYPOINTS (AUTONOMOUS FLIGHT)</div>
+        <div class="info-box">
+          Enter or paste coordinates in <strong>any format</strong> – the app parses automatically:<br>
+          <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">
+            55°43'44.1"N 13°18'47.4"E &nbsp;·&nbsp; 57.7089, 11.9746 &nbsp;·&nbsp; 57.7089° N 11.9746° E &nbsp;·&nbsp; 57.7089N 11.9746E
+          </span><br>
+          <span style="color:var(--text);font-size:11px;">Or upload a <strong>mission file</strong> directly:
+            <strong>ArduPilot / Mission Planner (.waypoints)</strong> · QGroundControl (.plan) · Litchi CSV
+          </span>
+        </div>
+        <div id="waypoint-list"></div>
+        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="window.addWaypoint()" style="border-color:var(--accent);color:var(--accent);">+ ADD WAYPOINT</button>
+          <button class="btn btn-secondary" onclick="window.clearWaypoints()" style="border-color:var(--danger);color:var(--danger);">✕ CLEAR ALL</button>
+          <button class="btn btn-secondary" onclick="window.toggleBulkImport()" style="border-color:var(--accent);color:var(--accent);">↓ TEXT IMPORT</button>
+          <input type="file" id="wp-file-input" accept=".waypoints,.txt,.plan,.mission,.wpl,.csv"
+            style="display:none;" onchange="window.loadWaypointFile(this)">
+          <input type="file" id="fence-file-input" accept=".waypoints,.txt,.fence,.plan"
+            style="display:none;" onchange="window.loadFenceFile(this)">
+          <button class="btn btn-secondary" onclick="document.getElementById('wp-file-input').click()"
+            style="border-color:var(--accent);color:var(--accent);">
+            📂 MISSION FILE (.waypoints)
+          </button>
+          <button class="btn btn-secondary" onclick="document.getElementById('fence-file-input').click()"
+            style="border-color:var(--accent2);color:var(--accent2);">
+            🔶 GEOFENCE FILE (.waypoints)
+          </button>
+          <button class="btn btn-secondary" onclick="window.clearFence()"
+            style="border-color:var(--accent2);color:var(--accent2);"
+            title="Clear geofence">✕ FENCE</button>
+          <button class="btn btn-secondary" onclick="window.openLFVMap()" style="border-color:var(--ok);color:var(--ok);">🗺 CAA MAP ↗</button>
+        </div>
+        <div id="wp-file-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;"></div>
+        <div id="fence-file-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);min-height:14px;"></div>
+        <div id="waypoint-import-box" style="display:none;margin-top:10px;">
+          <div class="field">
+            <label>Bulk import – one waypoint per line. Any supported coordinate format, then alt AGL (m) and name separated by comma</label>
+            <textarea id="waypoint-bulk" rows="6" placeholder="55°43'44.1&quot;N 13°18'47.4&quot;E, 50, Start&#10;57.7089, 11.9746, 75, WP1&#10;57.7089° N 11.9746° E, 75, WP2&#10;57.7200 11.9900, 0, Landing"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="window.parseBulkWaypoints()" style="margin-top:8px;">IMPORT TEXT</button>
+        </div>
+        <div id="waypoint-stats" style="display:none;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface2);border-radius:4px;padding:10px 14px;border:1px solid var(--border);display:flex;flex-wrap:wrap;gap:16px;"></div>
+        <div id="waypoint-preview" style="margin-top:12px;">
+          <div class="map-link-bar" id="waypoint-map-links" style="display:none;"></div>
+          <div class="leaflet-map-box" id="waypoint-leaflet-map" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ A5 – FULL ConOps / DOI (OPTIONAL)</div>
+        <div class="info-box">
+          Detailed operational description per SORA 2.5 Annex A. Complete the sections relevant to your operation.
+          All information here is included in the final briefing document.
+        </div>
+
+        <div class="form-grid full">
+          <div class="field">
+            <label>Purpose & Mission Description (DOI 1.1)</label>
+            <textarea id="op-purpose" rows="3" placeholder="Describe the purpose of the operation, business objective, client etc."></textarea>
+          </div>
+        </div>
+        <div class="form-grid full">
+          <div class="field">
+            <label>UAS system description (DOI 1.2)</label>
+            <select id="conops-uas-select" onchange="window.fillUasFromSelect(this.value)" style="margin-bottom:6px;">
+              <option value="">-- Select UAS model or enter manually --</option>
+              <option value="mavic3">DJI Mavic 3 Enterprise</option>
+              <option value="mavic3t">DJI Mavic 3 Thermal</option>
+              <option value="m30t">DJI Matrice 30T</option>
+              <option value="m300">DJI Matrice 300 RTK</option>
+              <option value="m350">DJI Matrice 350 RTK</option>
+              <option value="mini4">DJI Mini 4 Pro</option>
+              <option value="air3">DJI Air 3</option>
+              <option value="avata2">DJI Avata 2</option>
+              <option value="evo2">Autel EVO II Pro V3</option>
+              <option value="evomax">Autel EVO Max 4T</option>
+              <option value="anafi">Parrot ANAFI Ai</option>
+              <option value="skydio2">Skydio 2+</option>
+              <option value="schiebel">Schiebel Camcopter S-100</option>
+              <option value="custom">Other (enter manually)</option>
+            </select>
+            <textarea id="conops-uas" rows="3" placeholder="e.g. DJI Mavic 3 with RGB camera, single rotor, dual IMU, battery reserve 15min, max wind resistance 12 m/s..."></textarea>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Crew & roles (DOI 1.3)</label>
+            <textarea id="conops-crew" rows="3" placeholder="Pilot-in-command: [name]\nVisual observer: [name]\nGround crew: [name]\nOperations manager: [name]"></textarea>
+          </div>
+          <div class="field">
+            <label>Training & Certificates (DOI 1.4)</label>
+            <textarea id="conops-certs" rows="3" placeholder="e.g. A2 certificate of competency no. X, STS-01 cert, specific operations training completed [date]..."></textarea>
+          </div>
+        </div>
+        <div class="form-grid full">
+          <div class="field">
+            <label>Detailed route / operational description (DOI 2.1) – phases, routes, altitude profile</label>
+            <textarea id="conops-route" rows="4" placeholder="Phase 1: Departure from [location] VLOS, climb to 50m AGL heading north-east&#10;Phase 2: Aerial survey around coordinate X in rectangular pattern&#10;Phase 3: RTL along same corridor, landing at departure point..."></textarea>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Operating environment description (DOI 2.2) – terrain, obstacles, infrastructure</label>
+            <textarea id="conops-env" rows="3" placeholder="e.g. Industrial dock, 10m cranes 200m NW, power lines 150m S, open water surface below the flight path..."></textarea>
+          </div>
+          <div class="field">
+            <label>Exposed third parties (DOI 2.3) – ground & air</label>
+            <textarea id="conops-3rd" rows="3" placeholder="Ground: Approx. 5 dock workers in adjacent zone, not directly under&#10;Air: Helicopter corridor ESGG 1km S, normally no VFR outside CTR..."></textarea>
+          </div>
+        </div>
+        <div class="form-grid full">
+          <div class="field">
+            <label>Normal operating procedure – step-by-step (DOI 3.1)</label>
+            <textarea id="conops-normal" rows="5" placeholder="1. Pre-flight check per checklist (15 min)&#10;2. Contact with ATC/CAA and confirm airspace approval&#10;3. Departure procedure, motor test, hover test 2m&#10;4. Stepwise climb to operational altitude&#10;5. Mission execution&#10;6. Return and landing procedure&#10;7. Post-flight check and logging"></textarea>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Communication Plan (DOI 3.2)</label>
+            <textarea id="conops-comms" rows="3" placeholder="RC frequency: 2.4GHz / 5.8GHz&#10;Telemetry link: 900MHz backup&#10;Voice radio pilot↔obs: VHF channel 6&#10;ATC contact: 118.500 MHz"></textarea>
+          </div>
+          <div class="field">
+            <label>Separation & delineation (DOI 3.3)</label>
+            <textarea id="conops-sep" rows="3" placeholder="e.g. Operations area delineated with cones and tape 50m radius, safety personnel at three entry points, written authorisation from landowner..."></textarea>
+          </div>
+        </div>
+        <div class="form-grid full">
+          <div class="field">
+            <label>Operational limitations (DOI 3.4) – weather, time, restrictions</label>
+            <textarea id="conops-limits" rows="3" placeholder="Do not fly if: wind >8 m/s, visibility <800m, precipitation, temperature <0°C, darkness (no night certification)&#10;Time restriction: 04:00–19:00 UTC (06:00–21:00 CEST)&#10;Not within 50m of uncontrolled third parties"></textarea>
+          </div>
+        </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="window.validateAndNext(0, 1)">NEXT: VOLUME PLANNER →</button>
+      </div>
+    </div>
+	
+	<div class="panel" id="panel-volume">
+      <div class="panel-title">Step 2 – Volume Planner</div>
+      <div class="panel-sub">// FLIGHT GEOGRAPHY · CONTINGENCY VOLUME · GROUND RISK BUFFER (DIPUL METHOD)</div>
+
+      <div class="info-box">
+        Configure your operational volumes based on kinematic parameters. The map uses your waypoints from Step 1.
+        The calculated buffers will automatically carry over to the Containment and Risk Assessment steps.
+      </div>
+
+      <div class="form-grid four">
+        <div class="field">
+          <label>Flight Speed (m/s)</label>
+          <input type="number" id="vol-speed" value="15" step="1" oninput="window.calcVolumes()">
+        </div>
+        <div class="field">
+          <label>Wind Speed (m/s)</label>
+          <input type="number" id="vol-wind" value="8" step="1" oninput="window.calcVolumes()">
+        </div>
+        <div class="field">
+          <label>Flight Height AGL (m)</label>
+          <input type="number" id="vol-height" value="50" step="1" oninput="window.calcVolumes()">
+        </div>
+        <div class="field">
+          <label>Pos. Error / GNSS (m)</label>
+          <input type="number" id="vol-gps" value="3" step="1" oninput="window.calcVolumes()">
+        </div>
+      </div>
+
+      <div class="form-grid three">
+        <div class="field">
+          <label>Pilot Reaction Time (s)</label>
+          <input type="number" id="vol-reaction" value="3" step="0.5" oninput="window.calcVolumes()">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Typical: 3.0s</div>
+        </div>
+        <div class="field">
+          <label>System Latency (s)</label>
+          <input type="number" id="vol-latency" value="1" step="0.5" oninput="window.calcVolumes()">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Typical: 1.0s</div>
+        </div>
+        <div class="field">
+          <label>Termination Method (GRB)</label>
+          <select id="vol-fts" onchange="window.calcVolumes()">
+            <option value="ballistic">Ballistic (1:1 rule)</option>
+            <option value="parachute">Parachute (drift calculation)</option>
+            <option value="glide">Fixed-wing glide</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+          <div style="font-family:var(--mono); font-size:10px; color:var(--muted);">MAP & SAFETY BUFFERS</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btn-layer-topo" class="btn btn-secondary" onclick="window.toggleTopoMap()" style="font-size:10px; padding:6px 12px; border-color:var(--text); color:var(--text);" title="Show Swedish Topographic Map">
+              🇸🇪 LANTMÄTERIET TOPO
+            </button>
+            <button id="btn-layer-aip" class="btn btn-secondary" onclick="window.toggleAirspaceLayer()" style="font-size:10px; padding:6px 12px; border-color:var(--accent); color:var(--accent);" title="Show OpenAIP Airspace">
+              ✈ OPENAIP
+            </button>
+            <button id="btn-layer-lfv" class="btn btn-secondary" onclick="window.toggleLFVLayer()" style="font-size:10px; padding:6px 12px; border-color:#005b9f; color:#005b9f;" title="Show official Swedish airspace from LFV">
+              🇸🇪 LFV AIRSPACE
+            </button>
+            <button id="btn-layer-scb" class="btn btn-secondary" onclick="window.togglePopLayer()" style="font-size:10px; padding:6px 12px; border-color:var(--accent3); color:var(--accent3);" title="Show urban areas (SCB)">
+              👥 SCB DEMOGRAPHICS
+            </button>
+          </div>
+        </div>
+        
+        <div class="leaflet-map-box tall" id="volume-leaflet-map" style="height: 800px;"></div>
+        
+        <div style="position:absolute; top:40px; right:10px; background:var(--surface); padding:12px; border-radius:6px; border:1px solid var(--border); z-index:400; font-family:var(--mono); font-size:11px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="font-weight:bold; color:var(--text); margin-bottom:6px;">VOLUME RADII</div>
+          <div style="color:#2e7d32;">■ Flight Geography: <span id="res-fg" style="font-weight:bold;">0</span> m</div>
+          <div style="color:#e65100;">■ Contingency Vol: <span id="res-cv" style="font-weight:bold;">0</span> m</div>
+          <div style="color:#c62828;">■ Ground Risk Buffer: <span id="res-grb" style="font-weight:bold;">0</span> m</div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-weight:bold;">
+            TOTAL RADIUS: <span id="res-total" style="color:var(--accent);">0</span> m
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top: 16px;">
+        <button class="btn btn-secondary" onclick="window.goTo(0)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.goTo(2)">SAVE & NEXT: GRC / ARC / SAIL →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-1">
+      <div class="panel-title">Steps 2–7 – iGRC · GRC · ARC · SAIL</div>
+      <div class="panel-sub">// SORA 2.5 QUANTITATIVE RISK ASSESSMENT · JARUS JAR-doc-25 TABLE 2</div>
+
+      <div class="section-label">▸ STEP 2 – INTRINSIC GROUND RISK CLASS (iGRC)</div>
+      <div class="info-box">
+        SORA 2.5 determines iGRC from <strong>characteristic dimension (m)</strong> and <strong>max speed (m/s)</strong> + population density.
+        Dimensions fetched automatically from DOI step. iGRC scales 1–10; values >7 are outside SORA scope (certification category).
+      </div>
+
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="field">
+          <label>Characteristic dimension (m) – from DOI</label>
+          <input type="number" id="igrc-dim" placeholder="0.6" step="0.1" min="0" inputmode="decimal" lang="en" oninput="window.updateDimHint()">
+          <div id="dim-class-hint" style="font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:3px;"></div>
+        </div>
+        <div class="field">
+          <label>Max speed (m/s) – from DOI</label>
+          <input type="number" id="igrc-speed" placeholder="15" step="1" min="0" inputmode="decimal" lang="en" oninput="window.updateDimHint()">
+          <div id="speed-class-hint" style="font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:3px;"></div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:16px;">
+        <label>Population density in operations volume + ground risk buffer</label>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-controlled" value="controlled">
+            <label for="pop-controlled">Controlled<br><small>Segregated, no unauthorised persons</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-remote" value="remote">
+            <label for="pop-remote">Remote<br><small>&lt;5 ppl/km²</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-lightly" value="lightly">
+            <label for="pop-lightly">Lightly populated<br><small>&lt;50 ppl/km²</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-suburban" value="suburban">
+            <label for="pop-suburban">Suburban<br><small>&lt;500 ppl/km²</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-low-metro" value="low_metro">
+            <label for="pop-low-metro">Low density metro<br><small>&lt;5,000 ppl/km²</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-high-metro" value="high_metro">
+            <label for="pop-high-metro">High density metro<br><small>&lt;50,000 ppl/km²</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="pop" id="pop-assemblies" value="assemblies">
+            <label for="pop-assemblies">Assemblies of people<br><small>≥50,000 ppl/km²</small></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ STEP 3 – GROUND RISK MITIGATIONS (FINAL GRC) – ANNEX B</div>
+      <div class="info-box">
+        SORA 2.5 categorises mitigations as <strong>M1A</strong> (sheltering), <strong>M1B</strong> (operational restrictions), <strong>M1C</strong> (ground monitoring) and <strong>M2</strong> (technical energy reduction on impact).
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>M1A – Sheltering (population can take shelter)</label>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="m1a" id="m1a-no" value="none"><label for="m1a-no">None – open ground</label></div>
+          <div class="radio-option"><input type="radio" name="m1a" id="m1a-low" value="low"><label for="m1a-low">Low (−1) – some shelter available</label></div>
+          <div class="radio-option"><input type="radio" name="m1a" id="m1a-medium" value="medium"><label for="m1a-medium">Medium (−2) – inside building / vehicle</label></div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>M1B – Operational restrictions (reduces exposed population)</label>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="m1b" id="m1b-no" value="none"><label for="m1b-no">None</label></div>
+          <div class="radio-option"><input type="radio" name="m1b" id="m1b-medium" value="medium"><label for="m1b-medium">Medium (−1) – delineation of part of area</label></div>
+          <div class="radio-option"><input type="radio" name="m1b" id="m1b-high" value="high"><label for="m1b-high">High (−2) – entire area delineated</label></div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>M1C – Ground monitoring (dedicated person observing)</label>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="m1c" id="m1c-no" value="none"><label for="m1c-no">None</label></div>
+          <div class="radio-option"><input type="radio" name="m1c" id="m1c-low" value="low"><label for="m1c-low">Low (−1) – dedicated ground observer with authority to abort</label></div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:16px;">
+        <label>M2 – Technical risk reduction (parachute, termination system, low kinetic energy)</label>
+        <div class="radio-group">
+          <div class="radio-option"><input type="radio" name="m2" id="m2-no" value="none"><label for="m2-no">None</label></div>
+          <div class="radio-option"><input type="radio" name="m2" id="m2-medium" value="medium"><label for="m2-medium">Medium (−1) – parachute / FTS / low kinetic energy design</label></div>
+          <div class="radio-option"><input type="radio" name="m2" id="m2-high" value="high"><label for="m2-high">High (−2) – DVR / design-verified energy reduction</label></div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ STEP 4 – INITIAL AIR RISK CLASS (ARC) — DECISION TREE</div>
+      <div class="info-box">
+        Initial ARC is determined from the <strong>Airspace Encounter Class (AEC)</strong> decision tree
+        [SORA v2.5 Main Body, Figure 6 and Annex C, Table C.1]. Answer each question in order.
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Atypical / segregated airspace?</label>
+          <select id="arc-atypical" onchange="window.calcSAIL25()">
+            <option value="no">No</option>
+            <option value="yes">Yes – segregated, restricted, no manned traffic expected</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Operation above FL600?</label>
+          <select id="arc-above-fl600" onchange="window.calcSAIL25()">
+            <option value="no">No</option>
+            <option value="yes">Yes – above FL600</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Within airport / heliport environment?</label>
+          <select id="arc-airport-env" onchange="window.calcSAIL25()">
+            <option value="no">No</option>
+            <option value="yes">Yes (~5 km from runway centre, or as defined by authority)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Airspace class B, C or D? <small>(only if airport env = Yes)</small></label>
+          <select id="arc-class-bcd" onchange="window.calcSAIL25()">
+            <option value="no">No – Class E, F or G</option>
+            <option value="yes">Yes – Class B, C or D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Max altitude above 150 m AGL?</label>
+          <select id="arc-above-150" onchange="window.calcSAIL25()">
+            <option value="no">No – below 150 m AGL</option>
+            <option value="yes">Yes – above 150 m AGL (and below FL600)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mode-S Veil or Transponder Mandatory Zone (TMZ)?</label>
+          <select id="arc-mode-s" onchange="window.calcSAIL25()">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Controlled airspace (class A–E)?</label>
+          <select id="arc-controlled" onchange="window.calcSAIL25()">
+            <option value="no">No – uncontrolled (Class F/G)</option>
+            <option value="yes">Yes – controlled (Class A–E)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Primarily over urban area?</label>
+          <select id="arc-urban" onchange="window.calcSAIL25()">
+            <option value="no">No – rural / open area</option>
+            <option value="yes">Yes – urban area</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Competent authority / ANSP override ARC? <small>[SORA 4.4.4(d)]</small></label>
+          <select id="arc-authority-override" onchange="window.calcSAIL25()">
+            <option value="none">No override – use decision tree result</option>
+            <option value="b">ARC-b – authority raises to ARC-b</option>
+            <option value="c">ARC-c – authority raises to ARC-c</option>
+            <option value="d">ARC-d – authority raises to ARC-d</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="arc-initial-result" style="display:none; margin:12px 0; padding:10px 14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface2); font-family:var(--mono); font-size:11px; line-height:1.7;">
+        <!-- Populated by calcSAIL25() -->
+      </div>
+
+      <div class="section-label" style="margin-top:16px;">▸ STEP 5 – STRATEGIC MITIGATION (RESIDUAL ARC)</div>
+      <div class="info-box">
+        The operator may demonstrate that the <strong>local manned traffic density</strong> in the operational
+        volume is lower than the generalised AEC rating, reducing the ARC.
+        [SORA v2.5 Annex C, Table C.2] &nbsp;|&nbsp; Note: AEC 10, 11 and 12 are not in Table C.2.
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Demonstrated local density rating (1 = lowest)</label>
+          <select id="arc-local-density" onchange="window.calcSAIL25()">
+            <option value="none">No mitigation claimed</option>
+            <option value="1">1 – reference environment density (rural, uncontrolled &lt;150 m)</option>
+            <option value="2">2 – low local density demonstrated</option>
+            <option value="3">3 – moderate local density demonstrated</option>
+            <option value="4">4 – elevated local density (approaching AEC default)</option>
+            <option value="5">5 – full AEC default density (no reduction)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Claim ARC-a via atypical airspace demonstration?</label>
+          <select id="arc-claim-atypical" onchange="window.calcSAIL25()">
+            <option value="no">No</option>
+            <option value="yes">Yes – full atypical/segregated airspace demonstrated to authority</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-top:16px;">▸ STEP 6 – TACTICAL MITIGATION PERFORMANCE REQUIREMENT (TMPR)</div>
+      <div class="info-box">
+        TMPR is <strong>determined automatically</strong> from the residual ARC.
+        VLOS/EVLOS operations are exempt from TMPR — see-and-avoid is an acceptable
+        tactical mitigation for all ARC levels. [SORA v2.5, Section 4.6.4]
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Operational mode</label>
+          <select id="arc-vlos" onchange="window.calcSAIL25()">
+            <option value="bvlos">BVLOS – beyond visual line of sight</option>
+            <option value="vlos">VLOS / EVLOS – visual line of sight</option>
+          </select>
+        </div>
+      </div>
+      <div id="arc-tmpr-result" style="display:none; margin:12px 0 16px; padding:10px 14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface2); font-family:var(--mono); font-size:11px; line-height:1.7;">
+        <!-- Populated by calcSAIL25() -->
+      </div>
+
+      <div id="sail-box" class="sail-display sticky-summary" style="margin-top:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div class="sail-title" style="margin-bottom:2px;">// LIVE SORA 2.5 ASSESSMENT</div>
+            <div style="display:flex; align-items:baseline; gap:12px;">
+              <div class="sail-value" id="sail-num" style="font-size:36px;">–</div>
+            </div>
+          </div>
+          <div class="risk-grid" style="margin-top:0; display:flex; gap:10px;">
+            <div class="risk-card" style="padding:10px 16px;"><div class="risk-card-label">iGRC</div><div class="risk-card-value risk-med" id="igrc-val" style="font-size:22px;">–</div></div>
+            <div class="risk-card" style="padding:10px 16px;"><div class="risk-card-label">FINAL GRC</div><div class="risk-card-value risk-med" id="grc-val" style="font-size:22px;">–</div></div>
+            <div class="risk-card" style="padding:10px 16px;"><div class="risk-card-label">RESIDUAL ARC</div><div class="risk-card-value risk-med" id="arc-val" style="font-size:22px;">–</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(1)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.calcSAIL25(); window.goTo(3)">CALCULATE & NEXT: CONTAINMENT →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-2">
+      <div class="panel-title">Step 8 – Containment</div>
+      <div class="panel-sub">// NEW DEDICATED STEP IN SORA 2.5 · ANNEX E §E.4</div>
+
+      <div class="info-box">
+        Containment ensures that the <strong>Target Level of Safety is achieved in the adjacent area</strong>.
+        In SORA 2.5, containment is a dedicated step (#8) before OSO. Three robustness levels: <strong>Low / Medium / High</strong>.
+        Requirements depend on UA size, SAIL, population density in adjacent area, and presence of crowds within 1 km.
+      </div>
+
+      <div class="section-label">▸ ADJACENT AREA</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Population density in adjacent area</label>
+          <select id="cont-adj-pop">
+            <option value="sparse">Sparse / rural (&lt;25 pers/km²)</option>
+            <option value="suburban">Suburban (25–500 pers/km²)</option>
+            <option value="urban">Urban (&gt;500 pers/km²)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Crowd within 1 km of operations volume boundary</label>
+          <select id="cont-assembly">
+            <option value="no">No</option>
+            <option value="yes">Yes – increases containment requirements</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label">▸ CONTAINMENT MEASURES</div>
+      <div class="field" style="margin-bottom:16px;">
+        <label>Selected containment robustness level (SORA 2.5 Annex E §E.4)</label>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" name="containment" id="cont-low" value="low">
+            <label for="cont-low">Low robustness<br><small>Procedure-based measures, operator declaration</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="containment" id="cont-med" value="medium">
+            <label for="cont-med">Medium robustness<br><small>Technical and procedure-based measures, independent verification</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="containment" id="cont-high" value="high">
+            <label for="cont-high">High robustness<br><small>Certified technical measures, DVR from EASA</small></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Technical containment measure</label>
+          <select id="cont-tech-measure">
+            <option value="geofence">Geofencing (electronic geo-zone)</option>
+            <option value="parachute">Parachute / parachute system</option>
+            <option value="termination">Flight termination system (FTS)</option>
+            <option value="envelope">Automatic flight envelope restriction</option>
+            <option value="manual">Manual pilot containment (procedure)</option>
+            <option value="combo">Combination of the above</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Contingency volume / max drift from operations volume</label>
+          <input type="text" id="cont-contingency-vol" placeholder="e.g. 50m horizontal, 30m vertical">
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Justification for selected containment level</label>
+          <textarea id="cont-justification" class="auto-expand" rows="1" placeholder="Justify why the selected level is sufficient given adjacent area population density and SAIL level..."></textarea>
+        </div>
+      </div>
+
+      <div id="containment-assessment" class="sail-display" style="margin-top:16px;">
+        <div class="sail-title">// CONTAINMENT ASSESSMENT</div>
+        <div id="containment-result" style="font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:8px;">
+          Select containment parameters above for assessment.
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(2)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.assessContainment(); window.goTo(4)">NEXT: OSO →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-3">
+      <div class="panel-title">Step 9 – OSO (17 Operational Safety Objectives)</div>
+      <div class="panel-sub">// SORA 2.5 ANNEX E · OSO #01–09, #13, #16–20, #23–24 · CLICK TO TICK OFF</div>
+
+      <div class="info-box">
+        SORA 2.5 has <strong>17 OSOs</strong> with specific numbering: #01–#09, #13, #16–#20, #23–#24.
+        Note: OSO #10 (from 2.0) has been <strong>merged into OSO #05</strong> in version 2.5. Numbers #10–#12, #14–#15, #21–#22 do not exist in SORA 2.5.
+        Robustness level (Low/Medium/High) is based on your SAIL. <strong>Click</strong> to mark as fulfilled.
+      </div>
+
+      <div class="form-grid" style="margin-bottom:16px;">
+        <div class="field">
+          <label>Filter OSO by SAIL level (shows minimum requirements)</label>
+          <select id="oso-sail-filter" onchange="window.renderOSO()">
+            <option value="all">Show all OSOs</option>
+            <option value="I">SAIL I</option>
+            <option value="II">SAIL II</option>
+            <option value="III">SAIL III</option>
+            <option value="IV">SAIL IV</option>
+            <option value="V">SAIL V</option>
+            <option value="VI">SAIL VI</option>
+          </select>
+        </div>
+        <div class="field" style="align-self:flex-end; width: 100%;">
+          <div style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:var(--text); font-weight:bold;">
+            <span>OVERALL PROGRESS</span>
+            <span id="oso-progress-text">0 / 17 confirmed</span>
+          </div>
+          <div class="oso-progress-track">
+            <div id="oso-progress-fill" class="oso-progress-fill" style="background:var(--danger);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ TECHNICAL ROBUSTNESS (OSO #01–#09) <span id="oso-sec-1-status" class="oso-section-status"></span></div>
+      <div class="oso-list" id="oso-list-1"></div>
+
+      <div class="section-label" style="margin-top:24px;">▸ OPERATOR & PERSONNEL (OSO #13, #16–#17) <span id="oso-sec-2-status" class="oso-section-status"></span></div>
+      <div class="oso-list" id="oso-list-2"></div>
+
+      <div class="section-label" style="margin-top:24px;">▸ HUMAN & AUTOMATION (OSO #18–#20) <span id="oso-sec-3-status" class="oso-section-status"></span></div>
+      <div class="oso-list" id="oso-list-3"></div>
+
+      <div class="section-label" style="margin-top:24px;">▸ ENVIRONMENT & EXTERNAL FACTORS (OSO #23–#24) <span id="oso-sec-4-status" class="oso-section-status"></span></div>
+      <div class="oso-list" id="oso-list-4"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(3)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.goTo(5)">NEXT: WEATHER & AIRSPACE →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-4">
+      <div class="panel-title">Weather & Airspace Requirements</div>
+      <div class="panel-sub">// MANUAL INPUT · DIRECT LINKS TO SMHI & YR.NO · LIVE ASSESSMENT</div>
+
+      <div class="section-label">▸ OPEN WEATHER SERVICE IN NEW TAB – ENTER VALUES BELOW</div>
+      <div class="info-box">
+        Enter coordinates in the DOI step – the links below open the correct forecast page automatically.
+        <strong>Assessment updates in real time</strong> as you enter values in the fields.
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+        <button class="btn btn-secondary" onclick="window.openSMHI()" style="border-color:var(--accent);color:var(--accent);">🌦 SMHI.SE</button>
+        <button class="btn btn-secondary" onclick="window.openYr()" style="border-color:var(--accent);color:var(--accent);">🌤 YR.NO</button>
+        <button class="btn btn-secondary" onclick="window.openWindy()" style="border-color:var(--accent);color:var(--accent);">🌬 WINDY.COM</button>
+      </div>
+      <div id="smhi-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
+
+      <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span>▸ CURRENT WEATHER CONDITIONS</span>
+        <button onclick="window.autoFillWeatherFromNearestMetar()"
+          class="btn btn-secondary"
+          style="border-color:var(--accent);color:var(--accent);padding:5px 12px;font-size:10px;"
+          title="Fill all weather fields from the nearest METAR station to the start point">
+          ⛅ FILL FROM NEAREST METAR
+        </button>
+      </div>
+      <div id="wx-autofill-status" style="display:none;font-family:var(--mono);font-size:9px;
+        padding:6px 10px;border-radius:3px;margin-bottom:8px;"></div>
+		<div id="wx-go-nogo-banner" class="wx-banner wx-banner-none">WEATHER ASSESSMENT: WAITING FOR DATA</div>
+      <div class="weather-grid">
+        <div class="weather-card">
+          <div class="weather-icon">💨</div>
+          <div class="weather-label">WIND SPEED</div>
+          <input class="weather-input" type="text" id="w-wind" placeholder="m/s" oninput="window.updateWindKt()">
+          <div id="w-wind-kt" style="font-family:var(--mono);font-size:12px;color:var(--text);font-weight:bold;margin-top:6px;"></div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Max recommended: 8 m/s (15.5 kt)</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon" id="w-winddir-icon" style="display:inline-block; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);">↓</div>
+          <div class="weather-label">WIND DIRECTION</div>
+          <input class="weather-input" type="text" id="w-winddir" placeholder="degrees">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">0–360°</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">👁️</div>
+          <div class="weather-label">VISIBILITY</div>
+          <input class="weather-input" type="text" id="w-vis" placeholder="km">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">VLOS minimum: 800m</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">☁️</div>
+          <div class="weather-label">CLOUD COVER</div>
+          <input class="weather-input" type="text" id="w-cloud" placeholder="oktas (0–8)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">0–8 oktas</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">🌡️</div>
+          <div class="weather-label">TEMPERATURE</div>
+          <input class="weather-input" type="text" id="w-temp" placeholder="°C">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">Check UAS operating temperature range</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">💧</div>
+          <div class="weather-label">RELATIVE HUMIDITY</div>
+          <input class="weather-input" type="text" id="w-humid" placeholder="%">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">High humidity → icing risk</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">🌧️</div>
+          <div class="weather-label">PRECIPITATION</div>
+          <input class="weather-input" type="text" id="w-precip-mm" placeholder="mm/h">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">>0.5 mm/h = avoid</div>
+        </div>
+        <div class="weather-card">
+          <div class="weather-icon">📊</div>
+          <div class="weather-label">AIR PRESSURE</div>
+          <input class="weather-input" type="text" id="w-pressure" placeholder="hPa">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">Reference: 1013 hPa</div>
+        </div>
+      </div>
+
+      <div id="smhi-assessment" style="display:none;" class="sail-display" style="margin:16px 0;">
+        <div class="sail-title">// WEATHER ASSESSMENT FOR UAS FLIGHT</div>
+        <div id="smhi-assessment-content"></div>
+      </div>
+
+      <div class="col-12 mt-2" style="margin-top:24px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <label style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:2px;font-weight:bold;">// WEATHER ASSESSMENT FOR UAS FLIGHT (OPEN-METEO)</label>
+              <button id="btn-fetch-weather" class="btn btn-secondary" type="button" onclick="if(typeof window.fetchOpenMeteo === 'function') window.fetchOpenMeteo();" style="border-color:var(--accent);color:var(--accent);font-size:10px;padding:4px 8px;">
+                  ⟳ Fetch Weather Data
+              </button>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:4px;background:var(--surface2);">
+              <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;" id="weather-table">
+                  <thead style="background:var(--text);color:var(--surface);text-align:left;">
+                      <tr>
+                          <th style="padding:6px;">Time</th>
+                          <th style="padding:6px;">Temp (°C)</th>
+                          <th style="padding:6px;">Wind (m/s)</th>
+                          <th style="padding:6px;">Gust (m/s)</th>
+                          <th style="padding:6px;">Prec (mm)</th>
+                          <th style="padding:6px;">Cloud (%)</th>
+                          <th style="padding:6px;">Visi (m)</th>
+                      </tr>
+                  </thead>
+                  <tbody id="weather-tbody">
+                      <tr><td colspan="7" style="padding:10px;text-align:center;color:var(--muted);">Click fetch to load hourly data...</td></tr>
+                  </tbody>
+              </table>
+          </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field">
+          <label>Precipitation type</label>
+          <select id="w-precip">
+            <option value="none">None</option>
+            <option value="light">Light rain / drizzle</option>
+            <option value="moderate">Moderate rain</option>
+            <option value="heavy">Heavy rain / thunderstorm</option>
+            <option value="snow">Snow / ice</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Icing / frost risk</label>
+          <select id="w-ice">
+            <option value="no">No risk</option>
+            <option value="possible">Possible (0–5°C, humidity)</option>
+            <option value="yes">Yes – DO NOT FLY</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label">▸ AIRSPACE MAP</div>
+      <div class="info-box">
+        In-app maps use <strong>ESRI WorldTopo</strong> as base layer. With an <strong>OpenAIP API key</strong> (free account at <a href="https://www.openaip.net" target="_blank" rel="noopener" style="color:var(--accent);">openaip.net</a>) a complete airspace overlay is added to all maps — CTR, TMA, restrictions, UAS zones etc.
+        Without a key, no airspace data is shown on the map (use the external links below).
+      </div>
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div class="field">
+          <label>OpenAIP API key <span style="font-weight:400;color:var(--muted);">(optional – free at openaip.net)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="openaip-api-key" placeholder="e.g. a1b2c3d4e5f6..."
+              style="font-family:var(--mono);flex:1;"
+              oninput="var k=this.value.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,128);this.value=k;try{localStorage.setItem('openaip_key',k)}catch(e){};window.syncApiKeys();window.refreshAllMaps();"
+              value="">
+            <button class="btn btn-secondary" onclick="window.refreshAllMaps()" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
+              ↺ REFRESH MAPS
+            </button>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">
+            The key is saved in the browser localStorage and loaded automatically on next start.
+            Register free at openaip.net → My Account → API Keys
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+        <button class="btn btn-secondary" onclick="window.openLFVMap()" style="border-color:var(--accent);color:var(--accent);">🗺 CAA MAP</button>
+        <button class="btn btn-secondary" onclick="window.openOpenAIP()" style="border-color:var(--accent);color:var(--accent);">✈ OPENAIP AIRSPACE</button>
+        <button class="btn btn-secondary" onclick="window.openSkyVector()" style="border-color:var(--accent);color:var(--accent);">📡 SKYVECTOR VFR CHART</button>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <label style="font-family:var(--mono);font-size:11px;font-weight:700;">Embedded Airspace Chart (live – loads if browser permits)</label>
+          <button class="btn btn-secondary" onclick="window.toggleMapEmbed()" id="map-embed-btn" style="font-size:10px;padding:4px 10px;">SHOW MAP</button>
+        </div>
+        <div id="map-embed-container" style="display:none; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
+          <iframe id="map-iframe" src="" width="100%" height="420" style="border:none; display:block;" allowfullscreen></iframe>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:6px 10px;">
+            Source: OpenAIP / National charts · Zoomable · Red zones = restrictions · Click objects for info
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Airspace notes for briefing</label>
+          <textarea id="airspace-notes" class="auto-expand" rows="1" placeholder="e.g. No restrictions within 5km. CTR EGKK starts 8km NW. TMZ active 0900-1700.&#10;Screenshot attached: yes/no"></textarea>
+        </div>
+        <div class="field">
+          <label>Map image (URL or screenshot description)</label>
+          <input type="text" id="airspace-map-url" placeholder="e.g. link to screenshot or 'See attached map.png'">
+        </div>
+      </div>
+
+      <div class="section-label">▸ METAR · TAF (CHECKWX) & MANUAL NOTAM</div>
+      <div class="info-box">
+        Fetches <strong>METAR</strong> and <strong>TAF</strong> within a 50 km radius via CheckWX. 
+        <strong>NOTAMs cannot be fetched automatically</strong> (since we do not use US sources and no free European APIs exist). Use the links below for LFV ARO or Eurocontrol EAD and paste manually.
+      </div>
+
+      <div class="form-grid full" style="margin-bottom:12px;">
+        <div class="field">
+          <label>CheckWX API Key <span style="font-weight:400;color:var(--muted);">(Required for METAR/TAF – free at api.checkwx.com)</span></label>
+          <input type="text" id="checkwx-api-key" placeholder="Paste your CheckWX API key here..."
+            style="font-family:var(--mono);"
+            oninput="var k=this.value.trim();this.value=k;try{localStorage.setItem('checkwx_key',k)}catch(e){};window.syncApiKeys();"
+            value="">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+        <button class="btn btn-secondary" onclick="window.fetchAllRouteWx()" id="avwx-fetch-btn"
+          style="border-color:var(--ok); color:var(--ok);">
+          ⛅ FETCH METAR · TAF (50 km)
+        </button>
+        <button class="btn btn-secondary" onclick="window.clearWxData()"
+          style="border-color:var(--danger); color:var(--danger);">
+          ✕ CLEAR
+        </button>
+      </div>
+      <div id="avwx-status" style="font-family:var(--mono);font-size:11px;
+        color:var(--muted);margin-bottom:8px;min-height:16px;white-space:pre-line;"></div>
+      
+      <div id="avwx-result" style="display:none;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);
+          font-weight:bold;letter-spacing:1px;margin-bottom:8px;">METAR / TAF</div>
+        <div id="avwx-result-inner"></div>
+      </div>
+
+      <div class="form-grid three" style="margin-bottom:12px;">
+        <div class="field">
+          <label>Nearest ICAO (for reference)</label>
+          <input type="text" id="notam-icao" placeholder="e.g. ESGG, ESMS"
+            style="text-transform:uppercase;">
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <a href="https://aro.lfv.se/" target="_blank" rel="noopener"
+            class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;
+            border-color:var(--accent); color:var(--accent); width:100%; box-sizing:border-box;">⬡ LFV ARO (Sweden) ↗</a>
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <a href="https://www.ead.eurocontrol.int/" target="_blank" rel="noopener"
+            class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;
+            border-color:var(--accent); color:var(--accent); width:100%; box-sizing:border-box;">⬡ EAD BASIC (Europe) ↗</a>
+        </div>
+      </div>
+      <div class="form-grid full" style="margin-bottom:8px;">
+        <div class="field">
+          <label>Manual NOTAM / AIP SUP (Paste here)</label>
+          <textarea id="la-active-notam" class="auto-expand" rows="1"
+            placeholder="Paste active NOTAMs from AROWeb or EAD here.&#10;ESGG: Runway 21 closed for maintenance..."></textarea>
+        </div>
+      </div>
+
+<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>▸ RADIO FREQUENCIES & CONTACTS (<50KM)</span>
+        <button class="btn btn-secondary" onclick="window.updateRadioFreqUI()" style="border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;">⟳ REFRESH</button>
+      </div>
+      <div id="radio-freq-ui-container" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">Click Refresh or load coordinates to calculate nearby airport frequencies.</div>
+      </div>
+
+      <div class="section-label">▸ AIRSPACE AUTHORISATIONS</div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Airspace authorisation obtained via</label>
+          <div class="radio-group">
+            <div class="radio-option">
+              <input type="checkbox" id="la-lf" name="la">
+              <label for="la-lf">CAA (e.g. Transportstyrelsen)</label>
+            </div>
+            <div class="radio-option">
+              <input type="checkbox" id="la-uspace" name="la">
+              <label for="la-uspace">U-space / USSP</label>
+            </div>
+            <div class="radio-option">
+              <input type="checkbox" id="la-notam" name="la">
+              <label for="la-notam">NOTAM published</label>
+            </div>
+            <div class="radio-option">
+              <input type="checkbox" id="la-atc" name="la">
+              <label for="la-atc">ATC approval</label>
+            </div>
+            <div class="radio-option">
+              <input type="checkbox" id="la-geo" name="la">
+              <label for="la-geo">Geo-zones checked</label>
+            </div>
+            <div class="radio-option">
+              <input type="checkbox" id="la-none" name="la">
+              <label for="la-none">Open cat. – none required</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>NOTAM reference / Authorisation number</label>
+          <input type="text" id="la-ref" placeholder="e.g. A1234/26 or CAA-2026-...">
+        </div>
+        <div class="field">
+          <label>Weather warnings (fetched automatically)</label>
+          <input type="text" id="la-smhi-warning" placeholder="No active warnings (feature pending)" readonly>
+        </div>
+      </div>
+
+      <div class="section-label">▸ LOCAL RESTRICTIONS</div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Known restrictions in the operations area</label>
+          <textarea id="local-restrictions" placeholder="e.g. nature reserve, military restricted area, CTR, hospital helipad..."></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(4)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.goTo(6)">NEXT: CONT. & PROC. →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-5">
+      <div class="panel-title">Emergency & Contingency Plan</div>
+      <div class="panel-sub">// EMERGENCY & CONTINGENCY PROCEDURES</div>
+
+      <div class="section-label">▸ EMERGENCY PROCEDURES</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Emergency landing site (primary)</label>
+          <textarea id="em-land1" class="auto-expand" rows="1" placeholder="Describe location or coordinates"></textarea>
+        </div>
+        <div class="field">
+          <label>Emergency landing site (alternative)</label>
+          <textarea id="em-land2" class="auto-expand" rows="1" placeholder="Backup alternative"></textarea>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Return-to-Launch altitude</label>
+          <input type="text" id="em-rth" placeholder="e.g. 50m AGL – RTL altitude above home">
+        </div>
+        <div class="field">
+          <label>Minimum battery threshold for abort</label>
+          <input type="text" id="em-battery" placeholder="e.g. 25% / 15 min remaining">
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Procedure on signal loss (RC/data link)</label>
+          <textarea id="em-signal" class="auto-expand" rows="1" placeholder="e.g. UAS activates RTL after 10s link loss, pilot confirms on secondary frequency..."></textarea>
+        </div>
+      </div>
+
+      <div class="section-label">▸ CONTINGENCIES – OPERATION ABORT</div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Weather contingency</label>
+          <textarea id="cont-weather" class="auto-expand" rows="1" placeholder="e.g. Cancel if wind exceeds 8 m/s, secure UAS on ground, notify mission controller..."></textarea>
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Intrusion by unmanned aircraft (other UAS)</label>
+          <textarea id="cont-uas" class="auto-expand" rows="1" placeholder="e.g. Pilot manoeuvres clear, hovers or lands immediately, reports to ANS provider..."></textarea>
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Technical failure / malfunction</label>
+          <textarea id="cont-tech" class="auto-expand" rows="1" placeholder="e.g. Motor/propeller failure → activate emergency landing immediately, secure area, report..."></textarea>
+        </div>
+      </div>
+
+      <div class="section-label">▸ RESCUE & REPORTING</div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Alert chain – primary contact</label>
+          <textarea id="em-contact1" class="auto-expand" rows="1" placeholder="Name + phone number"></textarea>
+        </div>
+        <div class="field">
+          <label>Alert chain – secondary contact</label>
+          <textarea id="em-contact2" class="auto-expand" rows="1" placeholder="Name + phone number"></textarea>
+        </div>
+        <div class="field">
+          <label>Emergency number (SOS/112/911)</label>
+          <input type="text" id="em-sos" value="112" placeholder="112">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Mandatory reporting to (on incident)</label>
+          <textarea id="em-report" class="auto-expand" rows="1" placeholder="e.g. CAA, ANS provider, employer"></textarea>
+        </div>
+        <div class="field">
+          <label>ECCAIRS / Safety report system</label>
+          <textarea id="em-eccairs" class="auto-expand" rows="1" placeholder="e.g. ECCAIRS 2 / internal safety reporting system"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(5)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.goTo(7)">NEXT: TEM →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-6">
+      <div class="panel-title">Threats and Error Management (TEM)</div>
+      <div class="panel-sub">// IDENTIFICATION AND MITIGATION OF THREATS & ERRORS</div>
+
+      <div class="info-box">
+        <strong>Threats are events or hazards</strong> that occur outside the influence and control of the flight crew or operational personnel. An <strong>error is an action or inaction</strong> by an operational person that leads to deviations from organizational or personal intentions and expectations.
+      </div>
+
+      <div class="section-label">
+        <span>▸ THREATS</span>
+        <button class="btn btn-secondary" onclick="window.addCommonThreats()" style="margin-left:auto; border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;" title="Auto-fill common UAS threats">+ ADD COMMON THREATS</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 70px 70px 60px;gap:16px;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:bold;letter-spacing:1px;">
+        <label>Threat</label>
+        <label>Mitigation</label>
+        <label>Prob.</label>
+        <label>Sev.</label>
+        <span></span>
+      </div>
+      <div id="tem-threats-container">
+        </div>
+
+      <div class="section-label" style="margin-top:40px;">▸ ERRORS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 60px;gap:16px;margin-bottom:4px;">
+        <label>Error</label>
+        <label>Mitigation</label>
+        <span></span>
+      </div>
+      <div id="tem-errors-container">
+        </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(6)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.goTo(8)">NEXT: CHARTS →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-7">
+      <div class="panel-title">Charts & Annexes</div>
+      <div class="panel-sub">// UPLOAD FLIGHT CHARTS, MAPS OR PERMITS (PDF OR IMAGES)</div>
+
+      <div class="info-box">
+        Upload <strong>PDF files</strong> or <strong>Images</strong> (PNG/JPG) of your flight charts, U-space approvals or operational area maps. 
+        These will be automatically appended to the final Briefing document.
+      </div>
+
+      <div style="margin-bottom: 20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="file" id="chart-upload-input" accept=".pdf, image/*" multiple style="display:none;" onchange="window.handleChartUpload(this)">
+        <button class="btn btn-secondary" onclick="document.getElementById('chart-upload-input').click()" style="border-color:var(--accent);color:var(--accent);">
+          📁 UPLOAD PDF OR IMAGES
+        </button>
+        <button class="btn btn-secondary" onclick="window.clearCharts()" style="border-color:var(--danger);color:var(--danger);">
+          ✕ CLEAR ALL
+        </button>
+        <div id="chart-upload-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);"></div>
+      </div>
+
+      <div id="chart-gallery" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+        </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="window.goTo(7)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.generateBriefing(); window.goTo(9)">GENERATE BRIEFING →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-8">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
+        <div>
+          <div class="panel-title">Operations Briefing</div>
+          <div class="panel-sub">// GENERATED DOCUMENT – READY TO PRINT OR SAVE</div>
+        </div>
+        <button class="print-btn" onclick="window.printBriefingOnly()">⬡ PRINT / SAVE AS PDF</button>
+      </div>
+
+      <div class="briefing-output" id="briefing-content">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:28px;letter-spacing:1px;">
+          OPERATIONS BRIEF – GENERATED <span id="brief-timestamp"></span>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:24px;">
+        <button class="btn btn-secondary" onclick="window.goTo(8)">← BACK</button>
+        <button class="btn btn-primary" onclick="window.generateOFP(); window.goTo(10)">NEXT: OFP FLIGHT PLAN →</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-9">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:16px;">
+        <div>
+          <div class="panel-title">Operational Flight Plan</div>
+          <div class="panel-sub">// UAS OFP · BASED ON ADS/LUND UNIVERSITY OFP TEMPLATE REV 03</div>
+        </div>
+        <button class="print-btn" onclick="window.printOFPOnly()">⬡ PRINT / SAVE AS PDF</button>
+      </div>
+      <div id="ofp-content" class="briefing-output" style="font-size:11px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">Generate briefing first, then click OFP FLIGHT PLAN in the nav bar.</div>
+      </div>
+    </div>
+
+<div id="chart-modal" onclick="window.closeChartFullscreen()" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; flex-direction:column; justify-content:center; align-items:center; cursor:zoom-out; backdrop-filter:blur(3px);">
+    <div style="position:absolute; top:20px; right:30px; color:#fff; font-family:var(--mono); font-size:32px; font-weight:bold; cursor:pointer;">✕</div>
+    <div id="chart-modal-title" style="color:#fff; font-family:var(--mono); font-size:14px; margin-bottom:16px; font-weight:bold; letter-spacing:1px;"></div>
+    <img id="chart-modal-img" src="" style="max-width:95vw; max-height:85vh; object-fit:contain; border-radius:4px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+  </div>
+
+    <div class="panel" id="panel-11">
+      <div class="panel-title">Settings</div>
+      <div class="panel-sub">// API KEYS · PREFERENCES · APPLICATION SETTINGS</div>
+
+      <div class="info-box">
+        API keys are stored locally in your browser's <strong>localStorage</strong> and are never sent to any server other than the respective API provider.
+        They persist between sessions automatically.
+      </div>
+
+      <div class="section-label">▸ OPENAIP – AIRSPACE DATA</div>
+      <div class="form-grid full" style="margin-bottom:20px;">
+        <div class="field">
+          <label>OpenAIP API Key <span style="font-weight:400;color:var(--muted);">(optional – free at openaip.net)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="settings-openaip-key" placeholder="e.g. a1b2c3d4e5f6..."
+              style="font-family:var(--mono);flex:1;"
+              oninput="var k=this.value.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,128);this.value=k;try{localStorage.setItem('openaip_key',k)}catch(e){};window.syncApiKeys();window.refreshAllMaps();">
+            <button class="btn btn-secondary" onclick="window.refreshAllMaps()" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
+              ↺ TEST / REFRESH MAPS
+            </button>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">
+            Enables airspace overlay on all in-app maps (CTR, TMA, restrictions, UAS zones). Register free at openaip.net → My Account → API Keys.
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ CHECKWX – METAR / TAF WEATHER</div>
+      <div class="form-grid full" style="margin-bottom:20px;">
+        <div class="field">
+          <label>CheckWX API Key <span style="font-weight:400;color:var(--muted);">(required for METAR/TAF – free at api.checkwx.com)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="settings-checkwx-key" placeholder="Paste your CheckWX API key here..."
+              style="font-family:var(--mono);flex:1;"
+              oninput="var k=this.value.trim();this.value=k;try{localStorage.setItem('checkwx_key',k)}catch(e){};window.syncApiKeys();">
+            <button class="btn btn-secondary" onclick="window.testCheckWxKey()" style="font-size:11px;padding:8px 14px;border-color:var(--ok);color:var(--ok);white-space:nowrap;">
+              ✓ TEST KEY
+            </button>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">
+            Used to fetch METAR and TAF reports within 50 km of your operation area. Register free at api.checkwx.com.
+          </div>
+          <div id="settings-checkwx-status" style="font-family:var(--mono);font-size:10px;margin-top:6px;min-height:14px;"></div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ APPLICATION PREFERENCES</div>
+      <div class="form-grid" style="margin-bottom:20px;">
+        <div class="field">
+          <label>Theme</label>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="btn btn-secondary" onclick="document.documentElement.setAttribute('data-theme','light');localStorage.setItem('dbrf-theme','light');document.getElementById('theme-toggle-btn').textContent='🌙';" style="border-color:var(--accent);color:var(--accent);">☀️ LIGHT</button>
+            <button class="btn btn-secondary" onclick="document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('dbrf-theme','dark');document.getElementById('theme-toggle-btn').textContent='☀️';" style="border-color:var(--accent);color:var(--accent);">🌙 DARK</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Text Size</label>
+          <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+            <button onclick="window.adjustTextSize(-1)" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">−</button>
+            <span id="settings-textsize-label" style="font-family:var(--mono);font-size:11px;color:var(--text);min-width:40px;text-align:center;">0</span>
+            <button onclick="window.adjustTextSize(1)" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">+</button>
+            <button onclick="window.adjustTextSize(-window.currentTextOffset)" class="btn btn-secondary" style="font-size:10px;padding:6px 12px;border-color:var(--muted);color:var(--muted);">RESET</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">▸ DATA MANAGEMENT</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+        <button class="btn btn-secondary" onclick="window.settingsClearApiKeys()" style="border-color:var(--warn);color:var(--warn);">
+          🗑 CLEAR API KEYS
+        </button>
+        <button class="btn btn-secondary" onclick="window.dbrfNewPlan()" style="border-color:var(--danger);color:var(--danger);">
+          ✕ NEW PLAN (CLEAR ALL MISSION DATA)
+        </button>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;">
+        Clearing API keys removes them from localStorage. Mission data is only cleared when you start a new plan.
+      </div>
+
+      <div class="section-label" style="margin-top:32px;">▸ ABOUT MISSIONDESK</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.8;">
+        <div><span style="color:var(--muted);">APPLICATION</span> &nbsp; MissionDesk – EASA SORA UAS Operations Briefing System</div>
+        <div><span style="color:var(--muted);">REGULATION</span> &nbsp; EASA SORA v2.5 · EU 2019/947 · EU 2019/945 · ED Decision 2025/018/R</div>
+        <div><span style="color:var(--muted);">FRAMEWORK</span> &nbsp; Tauri v1.6.3 · Vite · Vanilla JS ES Modules</div>
+        <div><span style="color:var(--muted);">DATA SOURCES</span> &nbsp; CheckWX (METAR/TAF) · OpenAIP (Airspace) · SMHI (Observations)</div>
+        <div style="margin-top:8px;">
+          <a href="#" onclick="window.openUrl('https://buymeacoffee.com/MissionDesk')" style="color:var(--accent);font-family:var(--mono);font-size:11px;">☕ Support MissionDesk development</a>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:32px;">
+        <button class="btn btn-secondary" onclick="window.goTo(10)">← OFP FLIGHT PLAN</button>
+      </div>
+    </div>
+
+<script src="js/version.js"></script>
+<script src="js/igrc.js"></script>
+<script src="js/arc.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/pdf.js"></script>
+
+</body>
+</html>
