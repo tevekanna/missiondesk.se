@@ -552,7 +552,7 @@
       </div>
       <div style="text-align:center;">
         <a id="dlBtn"
-           href="https://github.com/tevekanna/missiondesk.se/releases/latest/download/MissionDesk_3.0.109_x64-setup.exe"
+           href="https://github.com/tevekanna/missiondesk.se/releases/latest"
            class="btn-download">
           <svg style="width:20px;height:20px;" viewBox="0 0 20 20" fill="none">
             <path d="M10 3v10M6 10l4 4 4-4M3 16h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -733,34 +733,48 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 
 /* ═══ GITHUB RELEASES API ═══ */
 async function fetchLatestRelease() {
-  const badge = document.getElementById('versionBadge');
-  const dlBtn = document.getElementById('dlBtn');
-  const dlVer = document.getElementById('dlVersion');
+  const badge   = document.getElementById('versionBadge');
+  const dlBtn   = document.getElementById('dlBtn');
+  const dlVer   = document.getElementById('dlVersion');
   const heroBadgeEl = document.getElementById('heroBadge');
+
+  // Hide button until we have a real URL
+  if (dlBtn) dlBtn.style.opacity = '0.4';
+
   try {
     const res = await fetch('https://api.github.com/repos/tevekanna/missiondesk.se/releases/latest');
     if (!res.ok) throw new Error('no release');
     const data = await res.json();
-    const tag = data.tag_name || '';
-    const ver = tag.replace(/^v/, '');
+
+    const tag   = data.tag_name || '';
+    const ver   = tag.replace(/^v/, '');
     const asset = (data.assets || []).find(a => a.name.toLowerCase().endsWith('.exe'));
-    const dlUrl = asset
-      ? asset.browser_download_url
-      : `https://github.com/tevekanna/missiondesk.se/releases/latest/download/MissionDesk_${ver}_x64-setup.exe`;
+
+    if (!asset) throw new Error('no exe asset');
+
+    // Use the exact URL from GitHub – no guessing on filename
+    const dlUrl = asset.browser_download_url;
+    const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
+
     if (dlVer) dlVer.textContent = 'MissionDesk v' + ver;
-    if (dlBtn) dlBtn.href = dlUrl;
-    if (badge) {
-      const sz = asset ? ' \u00b7 ' + (asset.size / 1024 / 1024).toFixed(1) + '\u00a0MB' : '';
-      badge.textContent = tag + sz;
+    if (dlBtn) {
+      dlBtn.href = dlUrl;
+      dlBtn.style.opacity = '1';
     }
+    if (badge)  badge.textContent  = tag + ' · ' + sizeMB + '\u00a0MB';
     if (heroBadgeEl) {
-      heroBadgeEl.textContent = tag + ' \u00b7 SORA v2.5 ' + (currentLang === 'sv' ? 'Kompatibel' : 'Compliant');
+      heroBadgeEl.textContent = tag + ' · SORA v2.5 ' +
+        (currentLang === 'sv' ? 'Kompatibel' : 'Compliant');
     }
   } catch {
+    // API failed – show releases page link instead
+    if (dlBtn) {
+      dlBtn.href = 'https://github.com/tevekanna/missiondesk.se/releases/latest';
+      dlBtn.style.opacity = '1';
+    }
     if (badge) badge.textContent = 'v3.0.109';
   }
 }
-
 /* ═══ SCROLL REVEAL ═══ */
 const ro = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
