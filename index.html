@@ -272,6 +272,50 @@
       background: color-mix(in srgb, var(--accent) 8%, transparent);
     }
     .btn-webapp svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    /* ── WEB VS DESKTOP COMPARISON ── */
+    .compare-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: var(--border); border: 1px solid var(--border);
+      border-radius: 4px; overflow: hidden;
+    }
+    @media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-col {
+      background: var(--surface); padding: 2rem;
+      transition: background var(--transition);
+    }
+    .compare-col-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem;
+      padding-bottom: 1rem; border-bottom: 1px solid var(--border);
+    }
+    .compare-col-icon {
+      width: 36px; height: 36px; border-radius: 3px;
+      border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .compare-col-icon svg { width: 18px; height: 18px; }
+    .compare-col-title {
+      font-family: var(--sans); font-size: 15px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--text);
+      transition: color var(--transition);
+    }
+    .compare-col-sub {
+      font-size: 12px; font-weight: 300; color: var(--muted);
+      margin-top: 2px; transition: color var(--transition);
+    }
+    .compare-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px; line-height: 1.5;
+    }
+    .compare-row:last-child { border-bottom: none; }
+    .compare-icon-yes { color: var(--accent); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .compare-icon-no  { color: var(--muted);  font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .compare-icon-partial { color: var(--accent2); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .compare-row-text { color: var(--text); transition: color var(--transition); }
+    .compare-row-note { color: var(--muted); font-size: 11px; margin-top: 2px; transition: color var(--transition); }
+    .compare-cta { margin-top: 1.5rem; display: flex; gap: 8px; flex-wrap: wrap; }
+
     @media (max-width: 780px) { .topbar-nav { display: none; } }
     @media (max-width: 500px) { .app-preview-body { grid-template-columns: 1fr; } .app-sidebar-mock { display: none; } }
   </style>
@@ -500,6 +544,88 @@
 
 <hr class="divider" />
 
+<!-- ═══ WEB VS DESKTOP ═══ -->
+<section id="versions">
+  <div class="container">
+    <div class="section-header" data-reveal>
+      <div class="section-label" data-i18n="cmp.label">Web App vs Desktop</div>
+      <h2 class="section-title" data-i18n="cmp.title">Choose the version<br>that fits your workflow</h2>
+      <p class="section-desc" data-i18n="cmp.desc">Both versions run the full SORA v2.5 engine. The web app requires no installation and is always up to date. The desktop app adds offline support, persistent settings, and a native file experience.</p>
+    </div>
+    <div class="compare-grid" data-reveal>
+
+      <!-- WEB -->
+      <div class="compare-col">
+        <div class="compare-col-header">
+          <div class="compare-col-icon">
+            <svg viewBox="0 0 18 18" fill="none">
+              <rect x="1" y="2" width="16" height="12" rx="1.5" stroke="var(--accent3)" stroke-width="1.2"/>
+              <path d="M6 14v1.5M12 14v1.5M4 15.5h10" stroke="var(--accent3)" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M5 7h8M5 9.5h5" stroke="var(--accent3)" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="compare-col-title" data-i18n="cmp.web.title">Web App</div>
+            <div class="compare-col-sub" data-i18n="cmp.web.sub">missiondesk.se/app · No installation</div>
+          </div>
+        </div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.sora">Full SORA v2.5 engine</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.noinst">No installation required</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.autoupd">Always the latest version</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.anyos">Works on any OS and device</div></div></div>
+        <div class="compare-row"><span class="compare-icon-partial">◐</span><div><div class="compare-row-text" data-i18n="cmp.row.apikeys.web">API keys saved per browser</div><div class="compare-row-note" data-i18n="cmp.row.apikeys.web.note">Stored in browser localStorage — cleared if you clear browser data</div></div></div>
+        <div class="compare-row"><span class="compare-icon-partial">◐</span><div><div class="compare-row-text" data-i18n="cmp.row.save.web">Plans saved to Downloads folder</div><div class="compare-row-note" data-i18n="cmp.row.save.web.note">No native file dialog — .dbrf files downloaded automatically</div></div></div>
+        <div class="compare-row"><span class="compare-icon-no">–</span><div><div class="compare-row-text" data-i18n="cmp.row.offline">Offline mode</div><div class="compare-row-note" data-i18n="cmp.row.offline.note">Requires internet connection</div></div></div>
+        <div class="compare-cta">
+          <a href="/app/" class="btn-webapp">
+            <svg viewBox="0 0 15 15" fill="none">
+              <rect x="1" y="2" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M5 12v1.5M10 12v1.5M3.5 13.5h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M4.5 6.5h6M4.5 8.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <span data-i18n="cmp.web.cta">Launch Web App</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- DESKTOP -->
+      <div class="compare-col" style="background:var(--surface2);">
+        <div class="compare-col-header">
+          <div class="compare-col-icon">
+            <svg viewBox="0 0 18 18" fill="none">
+              <rect x="1" y="3" width="16" height="11" rx="1.5" stroke="var(--accent)" stroke-width="1.2"/>
+              <path d="M5 14v1.5M13 14v1.5M3 15.5h12" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+              <rect x="4" y="6" width="10" height="5" rx="0.5" stroke="var(--accent)" stroke-width="1.0"/>
+            </svg>
+          </div>
+          <div>
+            <div class="compare-col-title" data-i18n="cmp.desk.title">Desktop App</div>
+            <div class="compare-col-sub" data-i18n="cmp.desk.sub">Windows 10 / 11 · x64 installer</div>
+          </div>
+        </div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.sora">Full SORA v2.5 engine</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.offline.desk">Full offline support</div><div class="compare-row-note" data-i18n="cmp.row.offline.desk.note">All SORA calculations run locally — no internet required</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.apikeys.desk">API keys stored persistently</div><div class="compare-row-note" data-i18n="cmp.row.apikeys.desk.note">Settings survive browser clears and OS restarts</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.save.desk">Native file dialog for saving plans</div><div class="compare-row-note" data-i18n="cmp.row.save.desk.note">Save and open .dbrf files anywhere on your system</div></div></div>
+        <div class="compare-row"><span class="compare-icon-yes">✓</span><div><div class="compare-row-text" data-i18n="cmp.row.perf">Optimised performance</div><div class="compare-row-note" data-i18n="cmp.row.perf.note">Runs as a native app via Tauri — no browser overhead</div></div></div>
+        <div class="compare-row"><span class="compare-icon-partial">◐</span><div><div class="compare-row-text" data-i18n="cmp.row.upd">Manual updates</div><div class="compare-row-note" data-i18n="cmp.row.upd.note">Download new releases from GitHub when available</div></div></div>
+        <div class="compare-row"><span class="compare-icon-partial">◐</span><div><div class="compare-row-text" data-i18n="cmp.row.winos">Windows only</div><div class="compare-row-note" data-i18n="cmp.row.winos.note">macOS and Linux planned for a future release</div></div></div>
+        <div class="compare-cta">
+          <a id="cmpDlBtn" href="#download" class="btn-primary" style="font-size:12px; padding:10px 20px;">
+            <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px;">
+              <path d="M8 2v8M5 7l3 3 3-3M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span data-i18n="cmp.desk.cta">Download free</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
 <!-- ═══ SORA PIPELINE ═══ -->
 <section id="sora">
   <div class="container">
@@ -651,6 +777,35 @@ const i18n = {
     'nav.webapp':'Web App',
     'hero.webapp':'Launch Web App',
     'footer.webapp':'Launch Web App',
+    'cmp.label':'Web App vs Desktop',
+    'cmp.title':'Choose the version<br>that fits your workflow',
+    'cmp.desc':'Both versions run the full SORA v2.5 engine. The web app requires no installation and is always up to date. The desktop app adds offline support, persistent settings, and a native file experience.',
+    'cmp.web.title':'Web App','cmp.web.sub':'missiondesk.se/app · No installation',
+    'cmp.web.cta':'Launch Web App',
+    'cmp.desk.title':'Desktop App','cmp.desk.sub':'Windows 10 / 11 · x64 installer',
+    'cmp.desk.cta':'Download free',
+    'cmp.row.sora':'Full SORA v2.5 engine',
+    'cmp.row.noinst':'No installation required',
+    'cmp.row.autoupd':'Always the latest version',
+    'cmp.row.anyos':'Works on any OS and device',
+    'cmp.row.apikeys.web':'API keys saved per browser',
+    'cmp.row.apikeys.web.note':'Stored in browser localStorage — cleared if you clear browser data',
+    'cmp.row.save.web':'Plans saved to Downloads folder',
+    'cmp.row.save.web.note':'No native file dialog — .dbrf files downloaded automatically',
+    'cmp.row.offline':'Offline mode',
+    'cmp.row.offline.note':'Requires internet connection',
+    'cmp.row.offline.desk':'Full offline support',
+    'cmp.row.offline.desk.note':'All SORA calculations run locally — no internet required',
+    'cmp.row.apikeys.desk':'API keys stored persistently',
+    'cmp.row.apikeys.desk.note':'Settings survive browser clears and OS restarts',
+    'cmp.row.save.desk':'Native file dialog for saving plans',
+    'cmp.row.save.desk.note':'Save and open .dbrf files anywhere on your system',
+    'cmp.row.perf':'Optimised performance',
+    'cmp.row.perf.note':'Runs as a native app via Tauri — no browser overhead',
+    'cmp.row.upd':'Manual updates',
+    'cmp.row.upd.note':'Download new releases from GitHub when available',
+    'cmp.row.winos':'Windows only',
+    'cmp.row.winos.note':'macOS and Linux planned for a future release',
     'hero.line2':'Mission Planning',
     'hero.sub':'Structured risk assessment and regulatory compliance for drone operations in the EU. Built for pilots and operators conducting missions in the Specific category \u2013 with full support for SORA v2.5, EU\u00a02019/947 and U-space.',
     'hero.cta':'Download free','hero.secondary':'Explore features \u2192',
@@ -697,6 +852,35 @@ const i18n = {
     'nav.webapp':'Webb-app',
     'hero.webapp':'Öppna webb-app',
     'footer.webapp':'Öppna webb-app',
+    'cmp.label':'Webb-app vs Desktop',
+    'cmp.title':'Välj den version<br>som passar ditt arbetsflöde',
+    'cmp.desc':'Båda versionerna kör hela SORA v2.5-motorn. Webb-appen kräver ingen installation och är alltid uppdaterad. Desktop-appen tillägger offline-stöd, beständiga inställningar och en native filupplevelse.',
+    'cmp.web.title':'Webb-app','cmp.web.sub':'missiondesk.se/app · Ingen installation',
+    'cmp.web.cta':'Öppna webb-app',
+    'cmp.desk.title':'Desktop-app','cmp.desk.sub':'Windows 10 / 11 · x64-installationsprogram',
+    'cmp.desk.cta':'Ladda ned gratis',
+    'cmp.row.sora':'Fullständig SORA v2.5-motor',
+    'cmp.row.noinst':'Ingen installation krävs',
+    'cmp.row.autoupd':'Alltid senaste versionen',
+    'cmp.row.anyos':'Fungerar på alla operativsystem och enheter',
+    'cmp.row.apikeys.web':'API-nycklar sparas per webbläsare',
+    'cmp.row.apikeys.web.note':'Lagras i webbläsarens localStorage — rensas om du rensar webbläsardata',
+    'cmp.row.save.web':'Uppdrag sparas till nedladdningsmappen',
+    'cmp.row.save.web.note':'Ingen native fildialogruta — .dbrf-filer laddas ned automatiskt',
+    'cmp.row.offline':'Offline-läge',
+    'cmp.row.offline.note':'Kräver internetanslutning',
+    'cmp.row.offline.desk':'Fullt offline-stöd',
+    'cmp.row.offline.desk.note':'Alla SORA-beräkningar körs lokalt — inget internet krävs',
+    'cmp.row.apikeys.desk':'API-nycklar sparas beständigt',
+    'cmp.row.apikeys.desk.note':'Inställningar överlever rensning av webbläsardata och omstarter',
+    'cmp.row.save.desk':'Native fildialogruta för att spara uppdrag',
+    'cmp.row.save.desk.note':'Spara och öppna .dbrf-filer var som helst på ditt system',
+    'cmp.row.perf':'Optimerad prestanda',
+    'cmp.row.perf.note':'Körs som en native-app via Tauri — ingen webbläsaroverhead',
+    'cmp.row.upd':'Manuella uppdateringar',
+    'cmp.row.upd.note':'Ladda ned nya versioner från GitHub när de finns tillgängliga',
+    'cmp.row.winos':'Endast Windows',
+    'cmp.row.winos.note':'macOS och Linux planeras i en framtida version',
     'hero.line2':'Uppdragsplanering',
     'hero.sub':'Strukturerad riskbed\u00f6mning och regulatorisk compliance f\u00f6r dr\u00f6noperationer i EU. Byggd f\u00f6r piloter och operat\u00f6rer i specifik kategori \u2013 med fullt st\u00f6d f\u00f6r SORA v2.5, EU\u00a02019/947 och U-space.',
     'hero.cta':'Ladda ned gratis','hero.secondary':'Utforska funktioner \u2192',
