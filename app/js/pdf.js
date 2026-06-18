@@ -900,7 +900,7 @@ window.generateOFP = function() {
 
     return `<tr style="${rowBg}">
       <td class="ofp-td-l">
-        <input id="${nameId}" type="text" value="${nameVal}" oninput="window.saveOfpField(this.id, this.value)" class="ofp-input" style="min-width:60px;font-family:monospace;" title="Editable – enter place name or identifier">
+        <input id="${nameId}" type="text" value="${nameVal}" data-ofp="save" class="ofp-input" style="min-width:60px;font-family:monospace;" title="Editable – enter place name or identifier">
       </td>
       <td class="ofp-td">${distIntTxt}</td>
       <td class="ofp-td">${distAccTxt}</td>
@@ -908,11 +908,11 @@ window.generateOFP = function() {
       <td class="ofp-td">${tIntTxt}</td>
       <td class="ofp-td">${tAccTxt}</td>
       <td class="ofp-td">${r.eto}</td>
-      <td class="ofp-td-i"><input type="time" id="${retoId}" value="${retoVal}" class="ofp-input" style="width:64px;font-family:monospace;" title="RETO – Revised ETO" onchange="window.saveOfpField(this.id, this.value); window.ofpRecalcRETO(${idx})"></td>
-      <td class="ofp-td-i"><input type="time" id="${atoId}" value="${atoVal}" class="ofp-input" style="width:64px;font-family:monospace;" title="ATO – Actual Time Over" onchange="window.saveOfpField(this.id, this.value); window.ofpRecalcRETO(${idx})"></td>
+      <td class="ofp-td-i"><input type="time" id="${retoId}" value="${retoVal}" class="ofp-input" style="width:64px;font-family:monospace;" title="RETO – Revised ETO" data-ofp="save-reto" data-ofp-idx="${idx}"></td>
+      <td class="ofp-td-i"><input type="time" id="${atoId}" value="${atoVal}" class="ofp-input" style="width:64px;font-family:monospace;" title="ATO – Actual Time Over" data-ofp="save-reto" data-ofp-idx="${idx}"></td>
       <td class="ofp-td">${eIntTxt}</td>
       <td class="ofp-td" style="${planColor}">${planTxt}</td>
-      <td class="ofp-td-i"><input type="number" min="0" max="100" step="0.1" id="${actualId}" value="${actualVal}" placeholder="–" class="ofp-input" style="width:40px;font-family:monospace;" title="Actual %" oninput="window.saveOfpField(this.id, this.value); window.ofpRecalcActual()"></td>
+      <td class="ofp-td-i"><input type="number" min="0" max="100" step="0.1" id="${actualId}" value="${actualVal}" placeholder="–" class="ofp-input" style="width:40px;font-family:monospace;" title="Actual %" data-ofp="save-actual"></td>
       <td class="ofp-td-i" id="ofp-diff-${idx}">–</td>
     </tr>`;
   }).join('');
@@ -981,10 +981,10 @@ window.generateOFP = function() {
             <td style="vertical-align:bottom; width:60%; padding:0;">
               <table style="width:100%; text-align:left; border-spacing:8px 0;">
                 <tr>
-                  <td><div class="ofp-text-xs">OFF BLOCK (UTC)</div><input id="ofp-off-block" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-off-block'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
-                  <td><div class="ofp-text-xs">TAKE OFF (UTC)</div><input class="ofp-input" style="font-family:monospace; border:1px solid #bbb; background:#fffde7;" value="${takeoffUTC}" type="time" oninput="window.ofpUpdateTakeoff(this.value)"></td>
-                  <td><div class="ofp-text-xs">ON BLOCK (UTC)</div><input id="ofp-on-block" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-on-block'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
-                  <td><div class="ofp-text-xs">LANDING (UTC)</div><input id="ofp-landing-time" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-landing-time'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
+                  <td><div class="ofp-text-xs">OFF BLOCK (UTC)</div><input id="ofp-off-block" data-ofp="save" value="${window.ofpInputData['ofp-off-block'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
+                  <td><div class="ofp-text-xs">TAKE OFF (UTC)</div><input class="ofp-input" style="font-family:monospace; border:1px solid #bbb; background:#fffde7;" value="${takeoffUTC}" type="time" data-ofp="takeoff"></td>
+                  <td><div class="ofp-text-xs">ON BLOCK (UTC)</div><input id="ofp-on-block" data-ofp="save" value="${window.ofpInputData['ofp-on-block'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
+                  <td><div class="ofp-text-xs">LANDING (UTC)</div><input id="ofp-landing-time" data-ofp="save" value="${window.ofpInputData['ofp-landing-time'] || ''}" class="ofp-input" style="font-family:monospace; border:1px solid #bbb;" type="time"></td>
                 </tr>
               </table>
             </td>
@@ -993,12 +993,12 @@ window.generateOFP = function() {
 
         <table style="width:100%; margin-bottom:12px; border-spacing:8px 0;">
           <tr>
-            <td><div class="ofp-text-xs">Callsign</div><input id="ofp-callsign" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-callsign'] ?? window.escHtml(callsign)}" class="ofp-input" style="font-weight:bold; font-family:monospace;"></td>
-            <td><div class="ofp-text-xs">From</div><input id="ofp-from" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-from'] ?? window.escHtml(fromField)}" class="ofp-input" style="font-family:monospace;"></td>
-            <td><div class="ofp-text-xs">To</div><input id="ofp-to" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-to'] ?? (window.escHtml(document.getElementById('delivery-dest-loc')?.value) || window.escHtml(toField))}" class="ofp-input" style="font-family:monospace;"></td>
-            <td><div class="ofp-text-xs">Alt (m AGL)</div><input id="ofp-alt" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-alt'] ?? window.escHtml(altM)}" class="ofp-input" style="font-family:monospace;"></td>
-            <td><div class="ofp-text-xs">Block time</div><input id="ofp-block-time" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-block-time'] || ''}" class="ofp-input" style="font-family:monospace;" type="time"></td>
-            <td><div class="ofp-text-xs">Airborne</div><input id="ofp-airborne" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-airborne'] || ''}" class="ofp-input" style="font-family:monospace;" type="time"></td>
+            <td><div class="ofp-text-xs">Callsign</div><input id="ofp-callsign" data-ofp="save" value="${window.ofpInputData['ofp-callsign'] ?? window.escHtml(callsign)}" class="ofp-input" style="font-weight:bold; font-family:monospace;"></td>
+            <td><div class="ofp-text-xs">From</div><input id="ofp-from" data-ofp="save" value="${window.ofpInputData['ofp-from'] ?? window.escHtml(fromField)}" class="ofp-input" style="font-family:monospace;"></td>
+            <td><div class="ofp-text-xs">To</div><input id="ofp-to" data-ofp="save" value="${window.ofpInputData['ofp-to'] ?? (window.escHtml(document.getElementById('delivery-dest-loc')?.value) || window.escHtml(toField))}" class="ofp-input" style="font-family:monospace;"></td>
+            <td><div class="ofp-text-xs">Alt (m AGL)</div><input id="ofp-alt" data-ofp="save" value="${window.ofpInputData['ofp-alt'] ?? window.escHtml(altM)}" class="ofp-input" style="font-family:monospace;"></td>
+            <td><div class="ofp-text-xs">Block time</div><input id="ofp-block-time" data-ofp="save" value="${window.ofpInputData['ofp-block-time'] || ''}" class="ofp-input" style="font-family:monospace;" type="time"></td>
+            <td><div class="ofp-text-xs">Airborne</div><input id="ofp-airborne" data-ofp="save" value="${window.ofpInputData['ofp-airborne'] || ''}" class="ofp-input" style="font-family:monospace;" type="time"></td>
           </tr>
         </table>
 
@@ -1006,23 +1006,23 @@ window.generateOFP = function() {
           <tr>
             <td style="width:50%; padding:0 6px 0 0; vertical-align:top;">
               <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; margin-bottom:4px;">
-                <tr><td style="padding:4px 6px;"><span class="ofp-text-xs">Dep info:</span> <input id="ofp-dep-info" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-dep-info'] || ''}" class="ofp-input" style="width:50%;"> <span class="ofp-text-xs">QNH:</span> <input id="ofp-dep-qnh" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-dep-qnh'] ?? v('w-pressure')}" class="ofp-input" style="font-family:monospace; width:40px;"></td></tr>
+                <tr><td style="padding:4px 6px;"><span class="ofp-text-xs">Dep info:</span> <input id="ofp-dep-info" data-ofp="save" value="${window.ofpInputData['ofp-dep-info'] || ''}" class="ofp-input" style="width:50%;"> <span class="ofp-text-xs">QNH:</span> <input id="ofp-dep-qnh" data-ofp="save" value="${window.ofpInputData['ofp-dep-qnh'] ?? v('w-pressure')}" class="ofp-input" style="font-family:monospace; width:40px;"></td></tr>
               </table>
               <table style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                 <tr>
-                  <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><div class="ofp-text-xs">TODR (m)</div><input id="ofp-todr" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-todr'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
-                  <td style="padding:4px 6px; width:50%;"><div class="ofp-text-xs">TODA (m)</div><input id="ofp-toda" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-toda'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
+                  <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><div class="ofp-text-xs">TODR (m)</div><input id="ofp-todr" data-ofp="save" value="${window.ofpInputData['ofp-todr'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
+                  <td style="padding:4px 6px; width:50%;"><div class="ofp-text-xs">TODA (m)</div><input id="ofp-toda" data-ofp="save" value="${window.ofpInputData['ofp-toda'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
                 </tr>
               </table>
             </td>
             <td style="width:50%; padding:0 0 0 6px; vertical-align:top;">
               <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; margin-bottom:4px;">
-                <tr><td style="padding:4px 6px;"><span class="ofp-text-xs">Arr info:</span> <input id="ofp-arr-info" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-arr-info'] || ''}" class="ofp-input" style="width:50%;"> <span class="ofp-text-xs">QNH:</span> <input id="ofp-arr-qnh" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-arr-qnh'] || ''}" class="ofp-input" style="font-family:monospace; width:40px;"></td></tr>
+                <tr><td style="padding:4px 6px;"><span class="ofp-text-xs">Arr info:</span> <input id="ofp-arr-info" data-ofp="save" value="${window.ofpInputData['ofp-arr-info'] || ''}" class="ofp-input" style="width:50%;"> <span class="ofp-text-xs">QNH:</span> <input id="ofp-arr-qnh" data-ofp="save" value="${window.ofpInputData['ofp-arr-qnh'] || ''}" class="ofp-input" style="font-family:monospace; width:40px;"></td></tr>
               </table>
               <table style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                 <tr>
-                  <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><div class="ofp-text-xs">LDR (m)</div><input id="ofp-ldr" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-ldr'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
-                  <td style="padding:4px 6px; width:50%;"><div class="ofp-text-xs">LDA (m)</div><input id="ofp-lda" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-lda'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
+                  <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><div class="ofp-text-xs">LDR (m)</div><input id="ofp-ldr" data-ofp="save" value="${window.ofpInputData['ofp-ldr'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
+                  <td style="padding:4px 6px; width:50%;"><div class="ofp-text-xs">LDA (m)</div><input id="ofp-lda" data-ofp="save" value="${window.ofpInputData['ofp-lda'] || ''}" class="ofp-input" style="font-family:monospace;"></td>
                 </tr>
               </table>
             </td>
@@ -1031,8 +1031,8 @@ window.generateOFP = function() {
 
         <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; margin-bottom:12px;">
           <tr>
-            <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><span class="ofp-text-xs">Dep clearance:</span> <input id="ofp-dep-clearance" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-dep-clearance'] || ''}" class="ofp-input" style="width:70%;"></td>
-            <td style="padding:4px 6px; width:50%;"><span class="ofp-text-xs">Arr clearance:</span> <input id="ofp-arr-clearance" oninput="window.saveOfpField(this.id, this.value)" value="${window.ofpInputData['ofp-arr-clearance'] || ''}" class="ofp-input" style="width:70%;"></td>
+            <td style="border-right:1px solid #ccc; padding:4px 6px; width:50%;"><span class="ofp-text-xs">Dep clearance:</span> <input id="ofp-dep-clearance" data-ofp="save" value="${window.ofpInputData['ofp-dep-clearance'] || ''}" class="ofp-input" style="width:70%;"></td>
+            <td style="padding:4px 6px; width:50%;"><span class="ofp-text-xs">Arr clearance:</span> <input id="ofp-arr-clearance" data-ofp="save" value="${window.ofpInputData['ofp-arr-clearance'] || ''}" class="ofp-input" style="width:70%;"></td>
           </tr>
         </table>
 
@@ -1072,7 +1072,7 @@ window.generateOFP = function() {
             </td>
             <td style="width:62%; vertical-align:top;">
               <div style="padding:4px 8px; background:#f0f0f0; border:1px solid #333; border-bottom:none; font-weight:bold; font-size:0.9em;">Notes / Remarks</div>
-              <textarea id="ofp-notes-area" oninput="window.saveOfpField(this.id, this.value)" style="width:100%; height:160px; border:1px solid #ccc; padding:8px; resize:none; font-size:0.95em; font-family:monospace; background:#fff;">${window.escHtml(notesContent)}</textarea>
+              <textarea id="ofp-notes-area" data-ofp="save" style="width:100%; height:160px; border:1px solid #ccc; padding:8px; resize:none; font-size:0.95em; font-family:monospace; background:#fff;">${window.escHtml(notesContent)}</textarea>
             </td>
           </tr>
         </table>
@@ -1080,8 +1080,8 @@ window.generateOFP = function() {
         <table style="width:100%; border-top:1px solid #ccc; padding-top:6px; font-size:0.85em; color:#666; border-collapse:collapse; page-break-inside:avoid;">
           <tr>
             <td style="width:33%;">Rev 03 · ${opDate || new Date().toISOString().slice(0,10)}</td>
-            <td style="width:33%; text-align:center;">Crew: <input id="ofp-crew" oninput="window.saveOfpField(this.id, this.value)" class="ofp-input" style="width:200px; text-align:center;" value="${window.ofpInputData['ofp-crew'] ?? window.escHtml(crewName)}"></td>
-            <td style="width:33%; text-align:right;">Date: <input id="ofp-date" oninput="window.saveOfpField(this.id, this.value)" class="ofp-input" style="width:100px; font-family:monospace; text-align:right;" value="${window.ofpInputData['ofp-date'] ?? window.escHtml(opDate)}"></td>
+            <td style="width:33%; text-align:center;">Crew: <input id="ofp-crew" data-ofp="save" class="ofp-input" style="width:200px; text-align:center;" value="${window.ofpInputData['ofp-crew'] ?? window.escHtml(crewName)}"></td>
+            <td style="width:33%; text-align:right;">Date: <input id="ofp-date" data-ofp="save" class="ofp-input" style="width:100px; font-family:monospace; text-align:right;" value="${window.ofpInputData['ofp-date'] ?? window.escHtml(opDate)}"></td>
           </tr>
         </table>
       </div>`;

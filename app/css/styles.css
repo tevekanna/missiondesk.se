@@ -830,6 +830,12 @@ input[type="number"] { -moz-appearance: textfield; }
   transform: translateY(-1px);
 }
 
+/* Chart-gallery hover effects (migrated off inline onmouseover/out, batch 5b).
+   The remove button needs !important to win over its inline background/color base;
+   the thumbnail has no inline opacity base, so no !important is needed there. */
+.chart-thumb:hover { opacity: 0.7; }
+.chart-remove-btn:hover { background: var(--danger) !important; color: #fff !important; }
+
 /* ═══════════════════════════════════════
    BRIEFING OUTPUT – "Flight Documentation"
    ═══════════════════════════════════════ */
@@ -1105,8 +1111,29 @@ textarea {
   font-size: 12px; 
   animation: pulse 2s infinite; 
 }
-@keyframes pulse { 
-  0% { opacity: 1; } 
-  50% { opacity: 0.4; } 
-  100% { opacity: 1; } 
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* Hover styling migrated from inline onmouseover/onmouseout handlers
+   (CSP inline-handler refactor, batch 1 — nav/header/sidebar).
+   !important is required because both elements carry an inline style="" base
+   (e.g. color:var(--muted); background:var(--surface2)), and inline styles
+   outrank a stylesheet rule — the old onmouseover handlers overrode them by
+   writing inline styles, so the CSS equivalent must override them too. */
+.header-back-link:hover {
+  color: var(--text) !important;
+  border-color: var(--accent) !important;
+}
+.text-size-btn:hover {
+  background: var(--border) !important;
+}
+
+/* Drone-suggestion dropdown item hover, migrated from inline onmouseover/onmouseout
+   (CSP inline-handler refactor, batch 2b). No !important needed — the generated item
+   carries no inline background in its base style. */
+.drone-suggestion-item:hover {
+  background: var(--surface2);
 }
