@@ -13,6 +13,8 @@
     gtag('js', new Date());
     gtag('config', 'G-LN5081QM18');
   </script>
+  <!-- App version — single source of truth (shared with the web app at /app/) -->
+  <script src="/app/js/version.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
@@ -395,7 +397,7 @@
   <div class="container" style="max-width:900px;">
     <div class="hero-badge">
       <div class="badge-dot"></div>
-      <span class="badge-text" id="heroBadge">v3.0.109 · SORA v2.5 Compliant</span>
+      <span class="badge-text" id="heroBadge">v3.1.1 · SORA v2.5 Compliant</span>
     </div>
     <h1 class="hero-headline">
       Professional UAS<br>
@@ -442,7 +444,7 @@
         <div class="app-preview-dot"></div>
         <div class="app-preview-dot"></div>
         <div class="app-preview-dot"></div>
-        <span class="app-preview-title">MissionDesk v3.0.109 · SORA Risk Assessment · Mission: Inspection Alpha-7</span>
+        <span class="app-preview-title" id="previewTitle">MissionDesk v3.1.1 · SORA Risk Assessment · Mission: Inspection Alpha-7</span>
       </div>
       <div class="app-preview-body">
         <div class="app-sidebar-mock">
@@ -699,7 +701,7 @@
     <div class="download-box" data-reveal>
       <div>
         <div class="download-label" data-i18n="dl.latest">Latest release</div>
-        <div class="download-version" id="dlVersion">MissionDesk v3.0.109</div>
+        <div class="download-version" id="dlVersion">MissionDesk v3.1.1</div>
         <div class="download-meta">
           <strong data-i18n="dl.beta">Beta release</strong> · SORA v2.5 (ED Decision 2025/018/R)<br>
           <span data-i18n="dl.free">Free to download and use. No registration required.</span>
@@ -725,7 +727,7 @@
           <span data-i18n="dl.btn">Download .exe</span>
           <span class="sub">Installer · Windows</span>
         </a>
-        <div class="version-badge" id="versionBadge">v3.0.109</div>
+        <div class="version-badge" id="versionBadge">v3.1.1</div>
         <div style="margin-top:0.75rem;">
           <a href="https://github.com/tevekanna/missiondesk.se/releases" class="btn-secondary" style="font-size:11px;" data-i18n="dl.allReleases">
             All releases on GitHub →
@@ -932,6 +934,18 @@ const i18n = {
   }
 };
 
+/* ═══ APP VERSION (single source of truth, from /app/js/version.js) ═══ */
+const APP_VERSION = (window.MISSIONDESK_VERSION || '3.1.1');
+function applyVersion() {
+  const v = 'v' + APP_VERSION;
+  const dlVer   = document.getElementById('dlVersion');
+  const badge   = document.getElementById('versionBadge');
+  const preview = document.getElementById('previewTitle');
+  if (dlVer)   dlVer.textContent   = 'MissionDesk ' + v;
+  if (badge)   badge.textContent   = v;
+  if (preview) preview.textContent = 'MissionDesk ' + v + ' · SORA Risk Assessment · Mission: Inspection Alpha-7';
+}
+
 /* ═══ LANGUAGE ═══ */
 let currentLang = localStorage.getItem('md_lang') || 'en';
 function applyLang(lang) {
@@ -947,8 +961,7 @@ function applyLang(lang) {
   });
   const badge = document.getElementById('heroBadge');
   if (badge) {
-    const ver = badge.textContent.split('\u00b7')[0].trim();
-    badge.textContent = ver + ' \u00b7 SORA v2.5 ' + (lang === 'sv' ? 'Kompatibel' : 'Compliant');
+    badge.textContent = 'v' + APP_VERSION + ' \u00b7 SORA v2.5 ' + (lang === 'sv' ? 'Kompatibel' : 'Compliant');
   }
 }
 document.getElementById('langToggle').addEventListener('click', () => applyLang(currentLang === 'en' ? 'sv' : 'en'));
@@ -963,10 +976,10 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 
 /* ═══ GITHUB RELEASES API ═══ */
 async function fetchLatestRelease() {
-  const badge   = document.getElementById('versionBadge');
-  const dlBtn   = document.getElementById('dlBtn');
-  const dlVer   = document.getElementById('dlVersion');
-  const heroBadgeEl = document.getElementById('heroBadge');
+  // Version text is driven by version.js (APP_VERSION), NOT by the release tag.
+  // This only wires the download button to the real .exe asset and shows its size.
+  const badge = document.getElementById('versionBadge');
+  const dlBtn = document.getElementById('dlBtn');
 
   // Hide button until we have a real URL
   if (dlBtn) dlBtn.style.opacity = '0.4';
@@ -976,33 +989,23 @@ async function fetchLatestRelease() {
     if (!res.ok) throw new Error('no release');
     const data = await res.json();
 
-    const tag   = data.tag_name || '';
-    const ver   = tag.replace(/^v/, '');
     const asset = (data.assets || []).find(a => a.name.toLowerCase().endsWith('.exe'));
-
     if (!asset) throw new Error('no exe asset');
 
     // Use the exact URL from GitHub – no guessing on filename
-    const dlUrl = asset.browser_download_url;
     const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
-
-    if (dlVer) dlVer.textContent = 'MissionDesk v' + ver;
     if (dlBtn) {
-      dlBtn.href = dlUrl;
+      dlBtn.href = asset.browser_download_url;
       dlBtn.style.opacity = '1';
     }
-    if (badge)  badge.textContent  = tag + ' · ' + sizeMB + '\u00a0MB';
-    if (heroBadgeEl) {
-      heroBadgeEl.textContent = tag + ' · SORA v2.5 ' +
-        (currentLang === 'sv' ? 'Kompatibel' : 'Compliant');
-    }
+    if (badge) badge.textContent = 'v' + APP_VERSION + ' · ' + sizeMB + '\u00a0MB';
   } catch {
-    // API failed – show releases page link instead
+    // API failed – fall back to the releases page; keep showing the app version
     if (dlBtn) {
       dlBtn.href = 'https://github.com/tevekanna/missiondesk.se/releases/latest';
       dlBtn.style.opacity = '1';
     }
-    if (badge) badge.textContent = 'v3.0.109';
+    if (badge) badge.textContent = 'v' + APP_VERSION;
   }
 }
 /* ═══ SCROLL REVEAL ═══ */
@@ -1020,6 +1023,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 });
 
 /* ═══ INIT ═══ */
+applyVersion();
 applyLang(currentLang);
 fetchLatestRelease();
 </script>
