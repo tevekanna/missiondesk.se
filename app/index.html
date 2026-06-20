@@ -2,23 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MissionDesk – EASA SORA UAS Operations Briefing System</title>
 <link rel="manifest" href="manifest.json">
+<!--
+  VENDORED THIRD-PARTY LIBRARIES (pinned, served locally from app/vendor/ — no runtime CDN dependency).
+    Leaflet  1.9.4    vendor/leaflet/   (leaflet.js + leaflet.css + images/ for control sprites)
+    Turf.js  7.3.5    vendor/turf/turf.min.js          (UMD global `turf`)
+    pdf.js   6.0.227  vendor/pdfjs/     (legacy ESM build: pdf.min.js + version-matched pdf.worker.min.js;
+                      files kept as .js so every static host serves them with a JavaScript MIME type)
+                      Upgraded from 3.11.174 → 6.0.227 — fixes CVE-2024-4367 (arbitrary JS via crafted PDF);
+                      eval is disabled by default from the 4.x line onward.
+  Google Fonts stays on CDN for now (cosmetic only — optional later follow-up to self-host).
+  Live map tile providers (Esri, Lantmäteriet, OpenAIP, LFV, SCB) stay remote — live data, not vendorable.
+-->
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&family=Barlow+Semi+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css"/>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/turf/turf.min.js"></script>
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <header>
   <div class="logo">
-    <button id="sidebar-toggle-btn" class="dbrf-btn theme-btn" onclick="window.toggleSidebar()" title="Toggle Navigation" style="margin-right:8px; padding:6px 10px; font-size:16px;">☰</button>
-    <a href="/" title="Back to missiondesk.se" style="
+    <button id="sidebar-toggle-btn" class="dbrf-btn theme-btn" data-action="toggle-sidebar" title="Toggle Navigation" style="margin-right:8px; padding:6px 10px; font-size:16px;">☰</button>
+    <a href="/" class="header-back-link" title="Back to missiondesk.se" style="
       display:inline-flex; align-items:center; gap:5px;
       font-family:var(--mono); font-size:9px; font-weight:bold;
       letter-spacing:0.1em; text-transform:uppercase;
@@ -26,9 +36,7 @@
       border:1px solid var(--border); border-radius:3px;
       padding:4px 8px; margin-right:8px;
       transition:color 0.2s, border-color 0.2s;
-      white-space:nowrap;"
-      onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'"
-      onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
+      white-space:nowrap;">
       ← missiondesk.se
     </a>
     <div class="logo-icon">
@@ -52,18 +60,18 @@
   <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0;">
     <div class="dbrf-bar">
       <span class="dbrf-status" id="dbrf-status" style="margin-right:8px; text-align:right;"></span>
-      <button class="dbrf-btn dbrf-btn-new" onclick="window.dbrfNewPlan()" title="Start a new MissionDesk plan">📄 NEW PLAN</button>
-      <input type="file" id="dbrf-open-input" accept=".dbrf" style="display:none;" onchange="dbrfLoad(this)">
-      <button class="dbrf-btn dbrf-btn-open" onclick="document.getElementById('dbrf-open-input').click()" title="Open a saved MissionDesk plan (.dbrf)">📂 OPEN PLAN</button>
-      <button class="dbrf-btn dbrf-btn-save" onclick="dbrfSave()" title="Save current plan as .dbrf file">💾 SAVE PLAN</button>
+      <button class="dbrf-btn dbrf-btn-new" data-action="new-plan" title="Start a new MissionDesk plan">📄 NEW PLAN</button>
+      <input type="file" id="dbrf-open-input" accept=".dbrf" style="display:none;">
+      <button class="dbrf-btn dbrf-btn-open" data-action="open-plan" title="Open a saved MissionDesk plan (.dbrf)">📂 OPEN PLAN</button>
+      <button class="dbrf-btn dbrf-btn-save" data-action="save-plan" title="Save current plan as .dbrf file">💾 SAVE PLAN</button>
     </div>
 
     <div style="width: 1px; height: 24px; background: var(--border);"></div>
 
     <div style="display: flex; align-items: center; gap: 12px;">
       <div class="header-badge">EASA SORA v2.5</div>
-      <div class="header-badge" style="border-color: var(--muted); color: var(--muted);" id="app-version">{{APP_VERSION}}</div>
-      <button id="theme-toggle-btn" class="dbrf-btn theme-btn" onclick="toggleTheme()" title="Toggle Light/Dark Theme">☀️</button>
+      <div class="header-badge" style="border-color: var(--muted); color: var(--muted);" id="app-version"></div>
+      <button id="theme-toggle-btn" class="dbrf-btn theme-btn" data-action="toggle-theme" title="Toggle Light/Dark Theme">☀️</button>
     </div>
   </div>
 </header>
@@ -71,32 +79,32 @@
 <div class="app-layout">
   <aside class="sidebar">
     <nav class="step-nav vertical">
-      <button class="step-btn active" onclick="goTo(0)"><span class="step-num">01</span>DOI / ConOps</button>
-      <button class="step-btn" onclick="goTo(1)"><span class="step-num">02</span>VOLUME PLAN</button>
-      <button class="step-btn" onclick="goTo(2)"><span class="step-num">03–07</span>GRC·ARC·SAIL<span id="stale-warn-sail" class="stale-warn" style="display:none;" title="Data has changed. Click here to update the SORA calculation.">⚠</span></button>
-      <button class="step-btn" onclick="goTo(3)"><span class="step-num">08</span>CONTAINMENT</button>
-      <button class="step-btn" onclick="goTo(4)"><span class="step-num">09</span>OSO</button>
-      <button class="step-btn" onclick="goTo(5)"><span class="step-num">WEATHER</span>AIRSPACE</button>
-      <button class="step-btn" onclick="goTo(6)"><span class="step-num">CONT.</span>PROC.</button>
-      <button class="step-btn" onclick="goTo(7)"><span class="step-num">TEM</span>THREATS</button>
-      <button class="step-btn" onclick="goTo(8)"><span class="step-num">10</span>CHARTS</button>
-      <button class="step-btn" onclick="window.generateBriefing(); goTo(9)"><span class="step-num">11</span>BRIEFING</button>
-      <button class="step-btn" onclick="window.generateOFP(); goTo(10)"><span class="step-num">OFP</span>FLIGHT PLAN</button>
+      <button class="step-btn active" data-goto="0"><span class="step-num">01</span>DOI / ConOps</button>
+      <button class="step-btn" data-goto="1"><span class="step-num">02</span>VOLUME PLAN</button>
+      <button class="step-btn" data-goto="2"><span class="step-num">03–07</span>GRC·ARC·SAIL<span id="stale-warn-sail" class="stale-warn" style="display:none;" title="Data has changed. Click here to update the SORA calculation.">⚠</span></button>
+      <button class="step-btn" data-goto="3"><span class="step-num">08</span>CONTAINMENT</button>
+      <button class="step-btn" data-goto="4"><span class="step-num">09</span>OSO</button>
+      <button class="step-btn" data-goto="5"><span class="step-num">WEATHER</span>AIRSPACE</button>
+      <button class="step-btn" data-goto="6"><span class="step-num">CONT.</span>PROC.</button>
+      <button class="step-btn" data-goto="7"><span class="step-num">TEM</span>THREATS</button>
+      <button class="step-btn" data-goto="8"><span class="step-num">10</span>CHARTS</button>
+      <button class="step-btn" data-action="generate-briefing"><span class="step-num">11</span>BRIEFING</button>
+      <button class="step-btn" data-action="generate-ofp"><span class="step-num">OFP</span>FLIGHT PLAN</button>
 
       <div style="margin-top: auto; border-top: 1px solid var(--border); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;">
         <span style="font-family:var(--mono); font-size:10px; color:var(--muted); font-weight:bold; letter-spacing:1px;">TEXT SIZE</span>
         <div style="display:flex; gap:6px;">
-          <button onclick="window.adjustTextSize(-1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">-</button>
-          <button onclick="window.adjustTextSize(1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">+</button>
+          <button class="text-size-btn" data-action="text-size" data-delta="-1" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;">-</button>
+          <button class="text-size-btn" data-action="text-size" data-delta="1" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:3px; cursor:pointer; font-weight:bold; transition:background 0.2s;">+</button>
         </div>
       </div>
-      <button class="step-btn" onclick="window.openUrl('https://forms.gle/rgJdKVip1NUxTFjs9')" style="border-top: 1px solid var(--border);">
+      <button class="step-btn" data-action="open-url" data-url="https://forms.gle/rgJdKVip1NUxTFjs9" style="border-top: 1px solid var(--border);">
         <span class="step-num">💬</span>FEEDBACK
       </button>
-      <button class="step-btn coffee-btn" onclick="window.openUrl('https://buymeacoffee.com/MissionDesk')">
+      <button class="step-btn coffee-btn" data-action="open-url" data-url="https://buymeacoffee.com/MissionDesk">
         <span class="step-num">🍺</span>BUY ME A COFFEE
       </button>
-      <button class="step-btn" onclick="goTo(11)" style="border-top: 1px solid var(--border);">
+      <button class="step-btn" data-goto="11" style="border-top: 1px solid var(--border);">
         <span class="step-num">⚙</span>SETTINGS
       </button>
     </nav>
@@ -123,15 +131,15 @@
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <input type="file" id="ql-mission-input" accept=".waypoints,.plan,.txt,.mission,.csv"
-            style="display:none;" onchange="quickLoadMission(this)">
+            style="display:none;">
           <input type="file" id="ql-fence-input" accept=".waypoints,.plan,.txt,.fence"
-            style="display:none;" onchange="quickLoadFence(this)">
+            style="display:none;">
           <input type="file" id="ql-rally-input" accept=".waypoints,.txt,.rally"
-            style="display:none;" onchange="quickLoadRally(this)">
-          <button onclick="document.getElementById('ql-mission-input').click()" class="btn btn-secondary" style="border-color:var(--accent); color:var(--accent); padding:10px 18px; font-size:11px;">📂 MISSION FILE (.waypoints)</button>
-          <button onclick="document.getElementById('ql-fence-input').click()" class="btn btn-secondary" style="border-color:var(--accent2); color:var(--accent2); padding:10px 18px; font-size:11px;">🔶 FENCE FILE (.waypoints)</button>
-          <button onclick="document.getElementById('ql-rally-input').click()" class="btn btn-secondary" style="border-color:var(--ok); color:var(--ok); padding:10px 18px; font-size:11px;">🟢 RALLY POINTS (.waypoints)</button>
-          <button onclick="clearQuickLoad()" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:10px 14px; font-size:11px;">✕ CLEAR ALL</button>
+            style="display:none;">
+          <button data-action="trigger-input" data-target="ql-mission-input" class="btn btn-secondary" style="border-color:var(--accent); color:var(--accent); padding:10px 18px; font-size:11px;">📂 MISSION FILE (.waypoints)</button>
+          <button data-action="trigger-input" data-target="ql-fence-input" class="btn btn-secondary" style="border-color:var(--accent2); color:var(--accent2); padding:10px 18px; font-size:11px;">🔶 FENCE FILE (.waypoints)</button>
+          <button data-action="trigger-input" data-target="ql-rally-input" class="btn btn-secondary" style="border-color:var(--ok); color:var(--ok); padding:10px 18px; font-size:11px;">🟢 RALLY POINTS (.waypoints)</button>
+          <button data-action="clear-quick-load" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:10px 14px; font-size:11px;">✕ CLEAR ALL</button>
         </div>
         <div id="ql-status" style="margin-top:10px;font-family:var(--mono);font-size:10px;
           color:var(--muted);line-height:1.9;min-height:16px;white-space:pre-line;"></div>
@@ -164,7 +172,7 @@
       <div class="form-grid three">
         <div class="field">
           <label>Date (ISO 8601) <span class="req-star">★</span></label>
-          <input type="text" id="op-date" placeholder="YYYY-MM-DD" maxlength="10" style="font-family:var(--mono);letter-spacing:1px;" oninput="window.formatDateInput(this)">
+          <input type="text" id="op-date" placeholder="YYYY-MM-DD" maxlength="10" style="font-family:var(--mono);letter-spacing:1px;">
         </div>
         <div class="field">
           <label>Planned departure time (UTC)</label>
@@ -172,7 +180,7 @@
         </div>
         <div class="field">
           <label>Estimated flight time (min)</label>
-          <input type="number" id="op-duration" placeholder="30" min="1"
+          <input type="number" id="op-duration" placeholder="30" min="1" max="1440"
             style="background:var(--surface2);" title="Auto-calculated – may also be edited manually" lang="en">
           <div id="duration-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Auto-calculated from waypoints and cruise speed</div>
         </div>
@@ -186,11 +194,7 @@
         <div class="field">
         <label>UAS / Model <span class="req-star">★</span></label>
         <div style="position:relative;">
-          <input type="text" id="drone-model" placeholder="e.g. DJI Mavic 3" autocomplete="off"
-            onfocus="window.showDroneSuggestions(this.value)"
-            onclick="window.showDroneSuggestions(this.value)"
-            oninput="window.droneLookupDebounced(this.value)" 
-            onblur="setTimeout(window.hideDroneSuggestions,250)">
+          <input type="text" id="drone-model" placeholder="e.g. DJI Mavic 3" autocomplete="off">
           <div id="drone-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:99;
             background:var(--surface);border:1px solid var(--accent);border-radius:3px;box-shadow:0 4px 16px rgba(0,0,0,0.15);max-height:250px;overflow-y:auto;"></div>
         </div>
@@ -198,29 +202,29 @@
       </div>
         <div class="field">
           <label>Characteristic dimension (m) ★</label>
-          <input type="number" id="drone-dim" placeholder="0.6" step="0.01" min="0" oninput="updateDimHint()" inputmode="decimal" lang="en">
+          <input type="number" id="drone-dim" placeholder="0.6" step="0.01" min="0" max="40" inputmode="decimal" lang="en">
           <div id="dim-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Largest dimension (diagonal for multirotor)</div>
         </div>
         <div class="field">
           <label>Maximum airspeed (m/s) ★</label>
-          <input type="number" id="drone-speed" placeholder="15" step="0.5" min="0" lang="en">
+          <input type="number" id="drone-speed" placeholder="15" step="0.5" min="0" max="200" lang="en">
         </div>
       </div>
       <div class="form-grid three">
         <div class="field">
           <label>Cruise speed (m/s) – for flight time calculation</label>
-          <input type="number" id="drone-cruise" placeholder="10" step="0.5" min="0.5" value="10"
-            oninput="recalcFlightTime()" inputmode="decimal" lang="en">
+          <input type="number" id="drone-cruise" placeholder="10" step="0.5" min="0.5" max="200" value="10"
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Default 10 m/s. Used to calculate flight time from waypoints.</div>
         </div>
         <div class="field">
           <label>Dwell time per waypoint (s)</label>
-          <input type="number" id="drone-wp-dwell" placeholder="0" step="1" min="0" value="0"
-            oninput="recalcFlightTime()" inputmode="decimal" lang="en">
+          <input type="number" id="drone-wp-dwell" placeholder="0" step="1" min="0" max="3600" value="0"
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Hover/dwell time per waypoint (hover, photo etc). Default 0 s.</div>
         </div>
         <div class="field" style="align-self:flex-end;">
-          <button class="btn btn-secondary" onclick="recalcFlightTime()" style="width:100%;font-size:11px;padding:10px; color:var(--accent); border-color:var(--accent);">
+          <button class="btn btn-secondary" data-action="recalc-flight-time" style="width:100%;font-size:11px;padding:10px; color:var(--accent); border-color:var(--accent);">
             ⏱ CALCULATE FLIGHT TIME
           </button>
         </div>
@@ -228,7 +232,7 @@
       <div class="form-grid three">
         <div class="field">
           <label>MTOM (kg) – for reference</label>
-          <input type="number" id="drone-mtom" placeholder="0.9" step="0.1" min="0" inputmode="decimal" lang="en">
+          <input type="number" id="drone-mtom" placeholder="0.9" step="0.1" min="0" max="25000" inputmode="decimal" lang="en">
         </div>
         <div class="field">
           <label>Remote ID active</label>
@@ -262,7 +266,7 @@
         font-family:var(--mono);font-size:9px;color:var(--accent);display:flex;align-items:flex-start;gap:8px;">
         <span style="flex-shrink:0;font-size:11px;">ℹ</span>
         <span id="nrg-source-text"></span>
-        <button onclick="nrgResetToDefaults()" title="Reset to default values"
+        <button data-action="nrg-reset" title="Reset to default values"
           style="margin-left:auto;flex-shrink:0;background:none;border:1px solid var(--accent);
           color:var(--accent);font-family:var(--mono);font-size:9px;padding:2px 8px;cursor:pointer;border-radius:2px;">
           ↺ RESET
@@ -277,7 +281,7 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-setup" placeholder="2" step="0.5" min="0" max="20" value="2"
-            oninput="nrgMarkEdited('nrg-setup');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Fixed overhead before take-off</div>
         </div>
         <div class="field">
@@ -287,7 +291,7 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-takeoff" placeholder="5" step="0.5" min="0" max="50" value="5"
-            oninput="nrgMarkEdited('nrg-takeoff');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">High power — vertical ascent phase</div>
         </div>
         <div class="field">
@@ -297,7 +301,7 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-cruise" placeholder="3" step="0.5" min="0" max="30" value="3"
-            oninput="nrgMarkEdited('nrg-cruise');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Horizontal cruise phase</div>
         </div>
         <div class="field">
@@ -307,7 +311,7 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-descent" placeholder="2.5" step="0.5" min="0" max="30" value="2.5"
-            oninput="nrgMarkEdited('nrg-descent');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Lower power — descent phase</div>
         </div>
       </div>
@@ -319,7 +323,7 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-takeoff-min" placeholder="1.5" step="0.5" min="0" value="1.5"
-            oninput="nrgMarkEdited('nrg-takeoff-min');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
         </div>
         <div class="field">
           <label>Descent phase (min)
@@ -328,12 +332,12 @@
               font-family:var(--mono);">DB</span>
           </label>
           <input type="number" id="nrg-descent-min" placeholder="1.5" step="0.5" min="0" value="1.5"
-            oninput="nrgMarkEdited('nrg-descent-min');recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
         </div>
         <div class="field">
           <label>Reserve margin (%)</label>
           <input type="number" id="nrg-reserve" placeholder="20" step="5" min="0" max="50" value="20"
-            oninput="recalcEnergy()" inputmode="decimal" lang="en">
+            inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Recommended ≥20% (RTL margin)</div>
         </div>
       </div>
@@ -395,7 +399,7 @@
         </div>
         <div class="field">
           <label>Operation type</label>
-          <select id="op-type" onchange="handleOpTypeChange()">
+          <select id="op-type">
             <option value="foto">Photo / Video</option>
             <option value="inspektion">Infrastructure inspection</option>
             <option value="lantmatning">Survey / Mapping</option>
@@ -407,7 +411,7 @@
         </div>
         <div class="field">
           <label>Flight category</label>
-          <select id="op-flighttype" onchange="handleFlightTypeChange()">
+          <select id="op-flighttype">
             <option value="standard">Standard flight</option>
             <option value="autonomt">Autonomous / Waypoint</option>
             <option value="svarm">Swarm</option>
@@ -431,15 +435,15 @@
       <div class="form-grid three">
         <div class="field">
           <label>Max altitude AGL (m)</label>
-          <input type="number" id="op-alt" placeholder="50" min="0" inputmode="decimal" lang="en">
+          <input type="number" id="op-alt" placeholder="50" min="0" max="10000" step="1" inputmode="decimal" lang="en">
         </div>
         <div class="field">
           <label>Operating radius / volume (m)</label>
-          <input type="number" id="op-radius" placeholder="200" min="0" inputmode="decimal" lang="en">
+          <input type="number" id="op-radius" placeholder="200" min="0" max="100000" step="1" inputmode="decimal" lang="en">
         </div>
         <div class="field">
           <label>Contingency volume / buffer (m)</label>
-          <input type="number" id="op-buffer" placeholder="50" min="0" inputmode="decimal" lang="en">
+          <input type="number" id="op-buffer" placeholder="50" min="0" max="100000" step="1" inputmode="decimal" lang="en">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Ground risk buffer (SORA 2.5 §2.2.4)</div>
         </div>
       </div>
@@ -459,7 +463,7 @@
         <div class="info-box" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
           <span>Delivery and transport operations require coordinates for <strong>start point</strong> and <strong>destination</strong>.
           Flight distance calculated automatically. Map updates as you enter coordinates.</span>
-          <button onclick="window.autoFillDeliveryCoords()"
+          <button data-action="autofill-delivery"
             class="btn btn-secondary"
             style="border-color:var(--accent);color:var(--accent);padding:6px 12px;font-size:10px;"
             title="Fill start/destination from loaded mission file (first and last waypoint)">
@@ -475,7 +479,7 @@
           </div>
           <div class="field">
             <label>📍 Start point – coordinates</label>
-            <input type="text" id="delivery-start-coords" placeholder="57.7089° N, 11.9746° E" oninput="window.updateDeliveryMap();window.calcDeliveryDistance();window.recalcFlightTime()">
+            <input type="text" id="delivery-start-coords" placeholder="57.7089° N, 11.9746° E">
             <div id="delivery-start-coords-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;display:none;"></div>
           </div>
         </div>
@@ -486,7 +490,7 @@
           </div>
           <div class="field">
             <label>🏁 Destination – coordinates</label>
-            <input type="text" id="delivery-dest-coords" placeholder="57.6823° N, 11.9724° E" oninput="window.updateDeliveryMap();window.calcDeliveryDistance();window.recalcFlightTime()">
+            <input type="text" id="delivery-dest-coords" placeholder="57.6823° N, 11.9724° E">
             <div id="delivery-dest-coords-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;display:none;"></div>
           </div>
         </div>
@@ -497,7 +501,7 @@
           </div>
           <div class="field">
             <label>Route distance (m) – auto-calculated</label>
-            <input type="number" id="delivery-distance" placeholder="Auto" min="0" style="background:var(--surface2);" inputmode="decimal" lang="en">
+            <input type="number" id="delivery-distance" placeholder="Auto" min="0" max="500000" step="1" style="background:var(--surface2);" inputmode="decimal" lang="en">
             <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;" id="delivery-dist-hint">Fill in coordinates above for auto-calculation</div>
           </div>
         </div>
@@ -526,25 +530,25 @@
         </div>
         <div id="waypoint-list"></div>
         <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="window.addWaypoint()" style="border-color:var(--accent);color:var(--accent);">+ ADD WAYPOINT</button>
-          <button class="btn btn-secondary" onclick="window.clearWaypoints()" style="border-color:var(--danger);color:var(--danger);">✕ CLEAR ALL</button>
-          <button class="btn btn-secondary" onclick="window.toggleBulkImport()" style="border-color:var(--accent);color:var(--accent);">↓ TEXT IMPORT</button>
+          <button class="btn btn-secondary" data-action="add-waypoint" style="border-color:var(--accent);color:var(--accent);">+ ADD WAYPOINT</button>
+          <button class="btn btn-secondary" data-action="clear-waypoints" style="border-color:var(--danger);color:var(--danger);">✕ CLEAR ALL</button>
+          <button class="btn btn-secondary" data-action="toggle-bulk-import" style="border-color:var(--accent);color:var(--accent);">↓ TEXT IMPORT</button>
           <input type="file" id="wp-file-input" accept=".waypoints,.txt,.plan,.mission,.wpl,.csv"
-            style="display:none;" onchange="window.loadWaypointFile(this)">
+            style="display:none;">
           <input type="file" id="fence-file-input" accept=".waypoints,.txt,.fence,.plan"
-            style="display:none;" onchange="window.loadFenceFile(this)">
-          <button class="btn btn-secondary" onclick="document.getElementById('wp-file-input').click()"
+            style="display:none;">
+          <button class="btn btn-secondary" data-action="trigger-input" data-target="wp-file-input"
             style="border-color:var(--accent);color:var(--accent);">
             📂 MISSION FILE (.waypoints)
           </button>
-          <button class="btn btn-secondary" onclick="document.getElementById('fence-file-input').click()"
+          <button class="btn btn-secondary" data-action="trigger-input" data-target="fence-file-input"
             style="border-color:var(--accent2);color:var(--accent2);">
             🔶 GEOFENCE FILE (.waypoints)
           </button>
-          <button class="btn btn-secondary" onclick="window.clearFence()"
+          <button class="btn btn-secondary" data-action="clear-fence"
             style="border-color:var(--accent2);color:var(--accent2);"
             title="Clear geofence">✕ FENCE</button>
-          <button class="btn btn-secondary" onclick="window.openLFVMap()" style="border-color:var(--ok);color:var(--ok);">🗺 CAA MAP ↗</button>
+          <button class="btn btn-secondary" data-action="open-lfv-map" style="border-color:var(--ok);color:var(--ok);">🗺 CAA MAP ↗</button>
         </div>
         <div id="wp-file-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;"></div>
         <div id="fence-file-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);min-height:14px;"></div>
@@ -553,7 +557,7 @@
             <label>Bulk import – one waypoint per line. Any supported coordinate format, then alt AGL (m) and name separated by comma</label>
             <textarea id="waypoint-bulk" rows="6" placeholder="55°43'44.1&quot;N 13°18'47.4&quot;E, 50, Start&#10;57.7089, 11.9746, 75, WP1&#10;57.7089° N 11.9746° E, 75, WP2&#10;57.7200 11.9900, 0, Landing"></textarea>
           </div>
-          <button class="btn btn-primary" onclick="window.parseBulkWaypoints()" style="margin-top:8px;">IMPORT TEXT</button>
+          <button class="btn btn-primary" data-action="parse-bulk-waypoints" style="margin-top:8px;">IMPORT TEXT</button>
         </div>
         <div id="waypoint-stats" style="display:none;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface2);border-radius:4px;padding:10px 14px;border:1px solid var(--border);display:flex;flex-wrap:wrap;gap:16px;"></div>
         <div id="waypoint-preview" style="margin-top:12px;">
@@ -577,7 +581,7 @@
         <div class="form-grid full">
           <div class="field">
             <label>UAS system description (DOI 1.2)</label>
-            <select id="conops-uas-select" onchange="window.fillUasFromSelect(this.value)" style="margin-bottom:6px;">
+            <select id="conops-uas-select" style="margin-bottom:6px;">
               <option value="">-- Select UAS model or enter manually --</option>
               <option value="mavic3">DJI Mavic 3 Enterprise</option>
               <option value="mavic3t">DJI Mavic 3 Thermal</option>
@@ -646,7 +650,7 @@
           </div>
         </div>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="window.validateAndNext(0, 1)">NEXT: VOLUME PLANNER →</button>
+        <button class="btn btn-primary" data-action="validate-next" data-from="0" data-to="1">NEXT: VOLUME PLANNER →</button>
       </div>
     </div>
 	
@@ -662,36 +666,36 @@
       <div class="form-grid four">
         <div class="field">
           <label>Flight Speed (m/s)</label>
-          <input type="number" id="vol-speed" value="15" step="1" oninput="window.calcVolumes()">
+          <input type="number" id="vol-speed" value="15" step="1" min="0" max="200">
         </div>
         <div class="field">
           <label>Wind Speed (m/s)</label>
-          <input type="number" id="vol-wind" value="8" step="1" oninput="window.calcVolumes()">
+          <input type="number" id="vol-wind" value="8" step="1" min="0" max="100">
         </div>
         <div class="field">
           <label>Flight Height AGL (m)</label>
-          <input type="number" id="vol-height" value="50" step="1" oninput="window.calcVolumes()">
+          <input type="number" id="vol-height" value="50" step="1" min="0" max="10000">
         </div>
         <div class="field">
           <label>Pos. Error / GNSS (m)</label>
-          <input type="number" id="vol-gps" value="3" step="1" oninput="window.calcVolumes()">
+          <input type="number" id="vol-gps" value="3" step="1" min="0" max="1000">
         </div>
       </div>
 
       <div class="form-grid three">
         <div class="field">
           <label>Pilot Reaction Time (s)</label>
-          <input type="number" id="vol-reaction" value="3" step="0.5" oninput="window.calcVolumes()">
+          <input type="number" id="vol-reaction" value="3" step="0.5" min="0" max="60">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Typical: 3.0s</div>
         </div>
         <div class="field">
           <label>System Latency (s)</label>
-          <input type="number" id="vol-latency" value="1" step="0.5" oninput="window.calcVolumes()">
+          <input type="number" id="vol-latency" value="1" step="0.5" min="0" max="60">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Typical: 1.0s</div>
         </div>
         <div class="field">
           <label>Termination Method (GRB)</label>
-          <select id="vol-fts" onchange="window.calcVolumes()">
+          <select id="vol-fts">
             <option value="ballistic">Ballistic (1:1 rule)</option>
             <option value="parachute">Parachute (drift calculation)</option>
             <option value="glide">Fixed-wing glide</option>
@@ -703,16 +707,16 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
           <div style="font-family:var(--mono); font-size:10px; color:var(--muted);">MAP & SAFETY BUFFERS</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="btn-layer-topo" class="btn btn-secondary" onclick="window.toggleTopoMap()" style="font-size:10px; padding:6px 12px; border-color:var(--text); color:var(--text);" title="Show Swedish Topographic Map">
+            <button id="btn-layer-topo" class="btn btn-secondary" data-action="toggle-topo-map" style="font-size:10px; padding:6px 12px; border-color:var(--text); color:var(--text);" title="Show Swedish Topographic Map">
               🇸🇪 LANTMÄTERIET TOPO
             </button>
-            <button id="btn-layer-aip" class="btn btn-secondary" onclick="window.toggleAirspaceLayer()" style="font-size:10px; padding:6px 12px; border-color:var(--accent); color:var(--accent);" title="Show OpenAIP Airspace">
+            <button id="btn-layer-aip" class="btn btn-secondary" data-action="toggle-airspace-layer" style="font-size:10px; padding:6px 12px; border-color:var(--accent); color:var(--accent);" title="Show OpenAIP Airspace">
               ✈ OPENAIP
             </button>
-            <button id="btn-layer-lfv" class="btn btn-secondary" onclick="window.toggleLFVLayer()" style="font-size:10px; padding:6px 12px; border-color:#005b9f; color:#005b9f;" title="Show official Swedish airspace from LFV">
+            <button id="btn-layer-lfv" class="btn btn-secondary" data-action="toggle-lfv-layer" style="font-size:10px; padding:6px 12px; border-color:#005b9f; color:#005b9f;" title="Show official Swedish airspace from LFV">
               🇸🇪 LFV AIRSPACE
             </button>
-            <button id="btn-layer-scb" class="btn btn-secondary" onclick="window.togglePopLayer()" style="font-size:10px; padding:6px 12px; border-color:var(--accent3); color:var(--accent3);" title="Show urban areas (SCB)">
+            <button id="btn-layer-scb" class="btn btn-secondary" data-action="toggle-pop-layer" style="font-size:10px; padding:6px 12px; border-color:var(--accent3); color:var(--accent3);" title="Show urban areas (SCB)">
               👥 SCB DEMOGRAPHICS
             </button>
           </div>
@@ -732,8 +736,8 @@
       </div>
 
       <div class="btn-row" style="margin-top: 16px;">
-        <button class="btn btn-secondary" onclick="window.goTo(0)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.goTo(2)">SAVE & NEXT: GRC / ARC / SAIL →</button>
+        <button class="btn btn-secondary" data-goto="0">← BACK</button>
+        <button class="btn btn-primary" data-goto="2">SAVE & NEXT: GRC / ARC / SAIL →</button>
       </div>
     </div>
 
@@ -750,12 +754,12 @@
       <div class="form-grid" style="margin-bottom:8px;">
         <div class="field">
           <label>Characteristic dimension (m) – from DOI</label>
-          <input type="number" id="igrc-dim" placeholder="0.6" step="0.1" min="0" inputmode="decimal" lang="en" oninput="window.updateDimHint()">
+          <input type="number" id="igrc-dim" placeholder="0.6" step="0.1" min="0" max="40" inputmode="decimal" lang="en">
           <div id="dim-class-hint" style="font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:3px;"></div>
         </div>
         <div class="field">
           <label>Max speed (m/s) – from DOI</label>
-          <input type="number" id="igrc-speed" placeholder="15" step="1" min="0" inputmode="decimal" lang="en" oninput="window.updateDimHint()">
+          <input type="number" id="igrc-speed" placeholder="15" step="1" min="0" max="200" inputmode="decimal" lang="en">
           <div id="speed-class-hint" style="font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:3px;"></div>
         </div>
       </div>
@@ -838,63 +842,63 @@
       <div class="form-grid">
         <div class="field">
           <label>Atypical / segregated airspace?</label>
-          <select id="arc-atypical" onchange="window.calcSAIL25()">
+          <select id="arc-atypical">
             <option value="no">No</option>
             <option value="yes">Yes – segregated, restricted, no manned traffic expected</option>
           </select>
         </div>
         <div class="field">
           <label>Operation above FL600?</label>
-          <select id="arc-above-fl600" onchange="window.calcSAIL25()">
+          <select id="arc-above-fl600">
             <option value="no">No</option>
             <option value="yes">Yes – above FL600</option>
           </select>
         </div>
         <div class="field">
           <label>Within airport / heliport environment?</label>
-          <select id="arc-airport-env" onchange="window.calcSAIL25()">
+          <select id="arc-airport-env">
             <option value="no">No</option>
             <option value="yes">Yes (~5 km from runway centre, or as defined by authority)</option>
           </select>
         </div>
         <div class="field">
           <label>Airspace class B, C or D? <small>(only if airport env = Yes)</small></label>
-          <select id="arc-class-bcd" onchange="window.calcSAIL25()">
+          <select id="arc-class-bcd">
             <option value="no">No – Class E, F or G</option>
             <option value="yes">Yes – Class B, C or D</option>
           </select>
         </div>
         <div class="field">
           <label>Max altitude above 150 m AGL?</label>
-          <select id="arc-above-150" onchange="window.calcSAIL25()">
+          <select id="arc-above-150">
             <option value="no">No – below 150 m AGL</option>
             <option value="yes">Yes – above 150 m AGL (and below FL600)</option>
           </select>
         </div>
         <div class="field">
           <label>Mode-S Veil or Transponder Mandatory Zone (TMZ)?</label>
-          <select id="arc-mode-s" onchange="window.calcSAIL25()">
+          <select id="arc-mode-s">
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>
         </div>
         <div class="field">
           <label>Controlled airspace (class A–E)?</label>
-          <select id="arc-controlled" onchange="window.calcSAIL25()">
+          <select id="arc-controlled">
             <option value="no">No – uncontrolled (Class F/G)</option>
             <option value="yes">Yes – controlled (Class A–E)</option>
           </select>
         </div>
         <div class="field">
           <label>Primarily over urban area?</label>
-          <select id="arc-urban" onchange="window.calcSAIL25()">
+          <select id="arc-urban">
             <option value="no">No – rural / open area</option>
             <option value="yes">Yes – urban area</option>
           </select>
         </div>
         <div class="field">
           <label>Competent authority / ANSP override ARC? <small>[SORA 4.4.4(d)]</small></label>
-          <select id="arc-authority-override" onchange="window.calcSAIL25()">
+          <select id="arc-authority-override">
             <option value="none">No override – use decision tree result</option>
             <option value="b">ARC-b – authority raises to ARC-b</option>
             <option value="c">ARC-c – authority raises to ARC-c</option>
@@ -916,7 +920,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Demonstrated local density rating (1 = lowest)</label>
-          <select id="arc-local-density" onchange="window.calcSAIL25()">
+          <select id="arc-local-density">
             <option value="none">No mitigation claimed</option>
             <option value="1">1 – reference environment density (rural, uncontrolled &lt;150 m)</option>
             <option value="2">2 – low local density demonstrated</option>
@@ -927,7 +931,7 @@
         </div>
         <div class="field">
           <label>Claim ARC-a via atypical airspace demonstration?</label>
-          <select id="arc-claim-atypical" onchange="window.calcSAIL25()">
+          <select id="arc-claim-atypical">
             <option value="no">No</option>
             <option value="yes">Yes – full atypical/segregated airspace demonstrated to authority</option>
           </select>
@@ -943,7 +947,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Operational mode</label>
-          <select id="arc-vlos" onchange="window.calcSAIL25()">
+          <select id="arc-vlos">
             <option value="bvlos">BVLOS – beyond visual line of sight</option>
             <option value="vlos">VLOS / EVLOS – visual line of sight</option>
           </select>
@@ -970,8 +974,8 @@
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(1)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.calcSAIL25(); window.goTo(3)">CALCULATE & NEXT: CONTAINMENT →</button>
+        <button class="btn btn-secondary" data-goto="1">← BACK</button>
+        <button class="btn btn-primary" data-action="recalc-sail-next">CALCULATE & NEXT: CONTAINMENT →</button>
       </div>
     </div>
 
@@ -1055,8 +1059,8 @@
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(2)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.assessContainment(); window.goTo(4)">NEXT: OSO →</button>
+        <button class="btn btn-secondary" data-goto="2">← BACK</button>
+        <button class="btn btn-primary" data-action="assess-containment-next">NEXT: OSO →</button>
       </div>
     </div>
 
@@ -1073,7 +1077,7 @@
       <div class="form-grid" style="margin-bottom:16px;">
         <div class="field">
           <label>Filter OSO by SAIL level (shows minimum requirements)</label>
-          <select id="oso-sail-filter" onchange="window.renderOSO()">
+          <select id="oso-sail-filter">
             <option value="all">Show all OSOs</option>
             <option value="I">SAIL I</option>
             <option value="II">SAIL II</option>
@@ -1107,8 +1111,8 @@
       <div class="oso-list" id="oso-list-4"></div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(3)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.goTo(5)">NEXT: WEATHER & AIRSPACE →</button>
+        <button class="btn btn-secondary" data-goto="3">← BACK</button>
+        <button class="btn btn-primary" data-goto="5">NEXT: WEATHER & AIRSPACE →</button>
       </div>
     </div>
 
@@ -1122,15 +1126,15 @@
         <strong>Assessment updates in real time</strong> as you enter values in the fields.
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
-        <button class="btn btn-secondary" onclick="window.openSMHI()" style="border-color:var(--accent);color:var(--accent);">🌦 SMHI.SE</button>
-        <button class="btn btn-secondary" onclick="window.openYr()" style="border-color:var(--accent);color:var(--accent);">🌤 YR.NO</button>
-        <button class="btn btn-secondary" onclick="window.openWindy()" style="border-color:var(--accent);color:var(--accent);">🌬 WINDY.COM</button>
+        <button class="btn btn-secondary" data-action="open-smhi" style="border-color:var(--accent);color:var(--accent);">🌦 SMHI.SE</button>
+        <button class="btn btn-secondary" data-action="open-yr" style="border-color:var(--accent);color:var(--accent);">🌤 YR.NO</button>
+        <button class="btn btn-secondary" data-action="open-windy" style="border-color:var(--accent);color:var(--accent);">🌬 WINDY.COM</button>
       </div>
       <div id="smhi-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
 
       <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <span>▸ CURRENT WEATHER CONDITIONS</span>
-        <button onclick="window.autoFillWeatherFromNearestMetar()"
+        <button data-action="autofill-weather-metar"
           class="btn btn-secondary"
           style="border-color:var(--accent);color:var(--accent);padding:5px 12px;font-size:10px;"
           title="Fill all weather fields from the nearest METAR station to the start point">
@@ -1144,7 +1148,7 @@
         <div class="weather-card">
           <div class="weather-icon">💨</div>
           <div class="weather-label">WIND SPEED</div>
-          <input class="weather-input" type="text" id="w-wind" placeholder="m/s" oninput="window.updateWindKt()">
+          <input class="weather-input" type="text" id="w-wind" placeholder="m/s">
           <div id="w-wind-kt" style="font-family:var(--mono);font-size:12px;color:var(--text);font-weight:bold;margin-top:6px;"></div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">Max recommended: 8 m/s (15.5 kt)</div>
         </div>
@@ -1200,7 +1204,7 @@
       <div class="col-12 mt-2" style="margin-top:24px; margin-bottom:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <label style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:2px;font-weight:bold;">// WEATHER ASSESSMENT FOR UAS FLIGHT (OPEN-METEO)</label>
-              <button id="btn-fetch-weather" class="btn btn-secondary" type="button" onclick="if(typeof window.fetchOpenMeteo === 'function') window.fetchOpenMeteo();" style="border-color:var(--accent);color:var(--accent);font-size:10px;padding:4px 8px;">
+              <button id="btn-fetch-weather" class="btn btn-secondary" type="button" data-action="fetch-open-meteo" style="border-color:var(--accent);color:var(--accent);font-size:10px;padding:4px 8px;">
                   ⟳ Fetch Weather Data
               </button>
           </div>
@@ -1256,9 +1260,8 @@
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="text" id="openaip-api-key" placeholder="e.g. a1b2c3d4e5f6..."
               style="font-family:var(--mono);flex:1;"
-              oninput="var k=this.value.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,128);this.value=k;try{localStorage.setItem('openaip_key',k)}catch(e){};window.syncApiKeys();window.refreshAllMaps();"
               value="">
-            <button class="btn btn-secondary" onclick="window.refreshAllMaps()" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
+            <button class="btn btn-secondary" data-action="refresh-all-maps" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
               ↺ REFRESH MAPS
             </button>
           </div>
@@ -1269,15 +1272,15 @@
         </div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-        <button class="btn btn-secondary" onclick="window.openLFVMap()" style="border-color:var(--accent);color:var(--accent);">🗺 CAA MAP</button>
-        <button class="btn btn-secondary" onclick="window.openOpenAIP()" style="border-color:var(--accent);color:var(--accent);">✈ OPENAIP AIRSPACE</button>
-        <button class="btn btn-secondary" onclick="window.openSkyVector()" style="border-color:var(--accent);color:var(--accent);">📡 SKYVECTOR VFR CHART</button>
+        <button class="btn btn-secondary" data-action="open-lfv-map" style="border-color:var(--accent);color:var(--accent);">🗺 CAA MAP</button>
+        <button class="btn btn-secondary" data-action="open-openaip" style="border-color:var(--accent);color:var(--accent);">✈ OPENAIP AIRSPACE</button>
+        <button class="btn btn-secondary" data-action="open-skyvector" style="border-color:var(--accent);color:var(--accent);">📡 SKYVECTOR VFR CHART</button>
       </div>
 
       <div style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
           <label style="font-family:var(--mono);font-size:11px;font-weight:700;">Embedded Airspace Chart (live – loads if browser permits)</label>
-          <button class="btn btn-secondary" onclick="window.toggleMapEmbed()" id="map-embed-btn" style="font-size:10px;padding:4px 10px;">SHOW MAP</button>
+          <button class="btn btn-secondary" data-action="toggle-map-embed" id="map-embed-btn" style="font-size:10px;padding:4px 10px;">SHOW MAP</button>
         </div>
         <div id="map-embed-container" style="display:none; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
           <iframe id="map-iframe" src="" width="100%" height="420" style="border:none; display:block;" allowfullscreen></iframe>
@@ -1309,17 +1312,16 @@
           <label>CheckWX API Key <span style="font-weight:400;color:var(--muted);">(Required for METAR/TAF – free at api.checkwx.com)</span></label>
           <input type="text" id="checkwx-api-key" placeholder="Paste your CheckWX API key here..."
             style="font-family:var(--mono);"
-            oninput="var k=this.value.trim();this.value=k;try{localStorage.setItem('checkwx_key',k)}catch(e){};window.syncApiKeys();"
             value="">
         </div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-        <button class="btn btn-secondary" onclick="window.fetchAllRouteWx()" id="avwx-fetch-btn"
+        <button class="btn btn-secondary" data-action="fetch-all-route-wx" id="avwx-fetch-btn"
           style="border-color:var(--ok); color:var(--ok);">
           ⛅ FETCH METAR · TAF (50 km)
         </button>
-        <button class="btn btn-secondary" onclick="window.clearWxData()"
+        <button class="btn btn-secondary" data-action="clear-wx-data"
           style="border-color:var(--danger); color:var(--danger);">
           ✕ CLEAR
         </button>
@@ -1360,7 +1362,7 @@
 
 <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
         <span>▸ RADIO FREQUENCIES & CONTACTS (<50KM)</span>
-        <button class="btn btn-secondary" onclick="window.updateRadioFreqUI()" style="border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;">⟳ REFRESH</button>
+        <button class="btn btn-secondary" data-action="update-radio-freq-ui" style="border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;">⟳ REFRESH</button>
       </div>
       <div id="radio-freq-ui-container" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:16px;">
         <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">Click Refresh or load coordinates to calculate nearby airport frequencies.</div>
@@ -1418,8 +1420,8 @@
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(4)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.goTo(6)">NEXT: CONT. & PROC. →</button>
+        <button class="btn btn-secondary" data-goto="4">← BACK</button>
+        <button class="btn btn-primary" data-goto="6">NEXT: CONT. & PROC. →</button>
       </div>
     </div>
 
@@ -1502,8 +1504,8 @@
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(5)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.goTo(7)">NEXT: TEM →</button>
+        <button class="btn btn-secondary" data-goto="5">← BACK</button>
+        <button class="btn btn-primary" data-goto="7">NEXT: TEM →</button>
       </div>
     </div>
 
@@ -1517,7 +1519,7 @@
 
       <div class="section-label">
         <span>▸ THREATS</span>
-        <button class="btn btn-secondary" onclick="window.addCommonThreats()" style="margin-left:auto; border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;" title="Auto-fill common UAS threats">+ ADD COMMON THREATS</button>
+        <button class="btn btn-secondary" data-action="add-common-threats" style="margin-left:auto; border-color:var(--accent);color:var(--accent);padding:4px 8px;font-size:9px;" title="Auto-fill common UAS threats">+ ADD COMMON THREATS</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 70px 70px 60px;gap:16px;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:bold;letter-spacing:1px;">
         <label>Threat</label>
@@ -1539,8 +1541,8 @@
         </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(6)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.goTo(8)">NEXT: CHARTS →</button>
+        <button class="btn btn-secondary" data-goto="6">← BACK</button>
+        <button class="btn btn-primary" data-goto="8">NEXT: CHARTS →</button>
       </div>
     </div>
 
@@ -1554,11 +1556,11 @@
       </div>
 
       <div style="margin-bottom: 20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <input type="file" id="chart-upload-input" accept=".pdf, image/*" multiple style="display:none;" onchange="window.handleChartUpload(this)">
-        <button class="btn btn-secondary" onclick="document.getElementById('chart-upload-input').click()" style="border-color:var(--accent);color:var(--accent);">
+        <input type="file" id="chart-upload-input" accept=".pdf, image/*" multiple style="display:none;">
+        <button class="btn btn-secondary" data-action="trigger-input" data-target="chart-upload-input" style="border-color:var(--accent);color:var(--accent);">
           📁 UPLOAD PDF OR IMAGES
         </button>
-        <button class="btn btn-secondary" onclick="window.clearCharts()" style="border-color:var(--danger);color:var(--danger);">
+        <button class="btn btn-secondary" data-action="clear-charts" style="border-color:var(--danger);color:var(--danger);">
           ✕ CLEAR ALL
         </button>
         <div id="chart-upload-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);"></div>
@@ -1568,8 +1570,8 @@
         </div>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="window.goTo(7)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.generateBriefing(); window.goTo(9)">GENERATE BRIEFING →</button>
+        <button class="btn btn-secondary" data-goto="7">← BACK</button>
+        <button class="btn btn-primary" data-action="generate-briefing">GENERATE BRIEFING →</button>
       </div>
     </div>
 
@@ -1579,7 +1581,7 @@
           <div class="panel-title">Operations Briefing</div>
           <div class="panel-sub">// GENERATED DOCUMENT – READY TO PRINT OR SAVE</div>
         </div>
-        <button class="print-btn" onclick="window.printBriefingOnly()">⬡ PRINT / SAVE AS PDF</button>
+        <button class="print-btn" data-action="print-briefing-only">⬡ PRINT / SAVE AS PDF</button>
       </div>
 
       <div class="briefing-output" id="briefing-content">
@@ -1589,8 +1591,8 @@
       </div>
 
       <div class="btn-row" style="margin-top:24px;">
-        <button class="btn btn-secondary" onclick="window.goTo(8)">← BACK</button>
-        <button class="btn btn-primary" onclick="window.generateOFP(); window.goTo(10)">NEXT: OFP FLIGHT PLAN →</button>
+        <button class="btn btn-secondary" data-goto="8">← BACK</button>
+        <button class="btn btn-primary" data-action="generate-ofp">NEXT: OFP FLIGHT PLAN →</button>
       </div>
     </div>
 
@@ -1600,14 +1602,14 @@
           <div class="panel-title">Operational Flight Plan</div>
           <div class="panel-sub">// UAS OFP · BASED ON ADS/LUND UNIVERSITY OFP TEMPLATE REV 03</div>
         </div>
-        <button class="print-btn" onclick="window.printOFPOnly()">⬡ PRINT / SAVE AS PDF</button>
+        <button class="print-btn" data-action="print-ofp-only">⬡ PRINT / SAVE AS PDF</button>
       </div>
       <div id="ofp-content" class="briefing-output" style="font-size:11px;">
         <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">Generate briefing first, then click OFP FLIGHT PLAN in the nav bar.</div>
       </div>
     </div>
 
-<div id="chart-modal" onclick="window.closeChartFullscreen()" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; flex-direction:column; justify-content:center; align-items:center; cursor:zoom-out; backdrop-filter:blur(3px);">
+<div id="chart-modal" data-action="close-chart-fullscreen" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; flex-direction:column; justify-content:center; align-items:center; cursor:zoom-out; backdrop-filter:blur(3px);">
     <div style="position:absolute; top:20px; right:30px; color:#fff; font-family:var(--mono); font-size:32px; font-weight:bold; cursor:pointer;">✕</div>
     <div id="chart-modal-title" style="color:#fff; font-family:var(--mono); font-size:14px; margin-bottom:16px; font-weight:bold; letter-spacing:1px;"></div>
     <img id="chart-modal-img" src="" style="max-width:95vw; max-height:85vh; object-fit:contain; border-radius:4px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
@@ -1628,9 +1630,8 @@
           <label>OpenAIP API Key <span style="font-weight:400;color:var(--muted);">(optional – free at openaip.net)</span></label>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="text" id="settings-openaip-key" placeholder="e.g. a1b2c3d4e5f6..."
-              style="font-family:var(--mono);flex:1;"
-              oninput="var k=this.value.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,128);this.value=k;try{localStorage.setItem('openaip_key',k)}catch(e){};window.syncApiKeys();window.refreshAllMaps();">
-            <button class="btn btn-secondary" onclick="window.refreshAllMaps()" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
+              style="font-family:var(--mono);flex:1;">
+            <button class="btn btn-secondary" data-action="refresh-all-maps" style="font-size:11px;padding:8px 14px;border-color:var(--accent);color:var(--accent);white-space:nowrap;">
               ↺ TEST / REFRESH MAPS
             </button>
           </div>
@@ -1646,9 +1647,8 @@
           <label>CheckWX API Key <span style="font-weight:400;color:var(--muted);">(required for METAR/TAF – free at api.checkwx.com)</span></label>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="text" id="settings-checkwx-key" placeholder="Paste your CheckWX API key here..."
-              style="font-family:var(--mono);flex:1;"
-              oninput="var k=this.value.trim();this.value=k;try{localStorage.setItem('checkwx_key',k)}catch(e){};window.syncApiKeys();">
-            <button class="btn btn-secondary" onclick="window.testCheckWxKey()" style="font-size:11px;padding:8px 14px;border-color:var(--ok);color:var(--ok);white-space:nowrap;">
+              style="font-family:var(--mono);flex:1;">
+            <button class="btn btn-secondary" data-action="test-checkwx-key" style="font-size:11px;padding:8px 14px;border-color:var(--ok);color:var(--ok);white-space:nowrap;">
               ✓ TEST KEY
             </button>
           </div>
@@ -1664,27 +1664,27 @@
         <div class="field">
           <label>Theme</label>
           <div style="display:flex;gap:8px;margin-top:4px;">
-            <button class="btn btn-secondary" onclick="document.documentElement.setAttribute('data-theme','light');localStorage.setItem('dbrf-theme','light');document.getElementById('theme-toggle-btn').textContent='🌙';" style="border-color:var(--accent);color:var(--accent);">☀️ LIGHT</button>
-            <button class="btn btn-secondary" onclick="document.documentElement.setAttribute('data-theme','dark');localStorage.setItem('dbrf-theme','dark');document.getElementById('theme-toggle-btn').textContent='☀️';" style="border-color:var(--accent);color:var(--accent);">🌙 DARK</button>
+            <button class="btn btn-secondary" data-action="set-theme" data-theme="light" style="border-color:var(--accent);color:var(--accent);">☀️ LIGHT</button>
+            <button class="btn btn-secondary" data-action="set-theme" data-theme="dark" style="border-color:var(--accent);color:var(--accent);">🌙 DARK</button>
           </div>
         </div>
         <div class="field">
           <label>Text Size</label>
           <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
-            <button onclick="window.adjustTextSize(-1)" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">−</button>
+            <button data-action="text-size" data-delta="-1" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">−</button>
             <span id="settings-textsize-label" style="font-family:var(--mono);font-size:11px;color:var(--text);min-width:40px;text-align:center;">0</span>
-            <button onclick="window.adjustTextSize(1)" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">+</button>
-            <button onclick="window.adjustTextSize(-window.currentTextOffset)" class="btn btn-secondary" style="font-size:10px;padding:6px 12px;border-color:var(--muted);color:var(--muted);">RESET</button>
+            <button data-action="text-size" data-delta="1" class="btn btn-secondary" style="width:36px;height:36px;padding:0;font-size:16px;font-weight:bold;">+</button>
+            <button data-action="text-size-reset" class="btn btn-secondary" style="font-size:10px;padding:6px 12px;border-color:var(--muted);color:var(--muted);">RESET</button>
           </div>
         </div>
       </div>
 
       <div class="section-label">▸ DATA MANAGEMENT</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-        <button class="btn btn-secondary" onclick="window.settingsClearApiKeys()" style="border-color:var(--warn);color:var(--warn);">
+        <button class="btn btn-secondary" data-action="settings-clear-api-keys" style="border-color:var(--warn);color:var(--warn);">
           🗑 CLEAR API KEYS
         </button>
-        <button class="btn btn-secondary" onclick="window.dbrfNewPlan()" style="border-color:var(--danger);color:var(--danger);">
+        <button class="btn btn-secondary" data-action="new-plan" style="border-color:var(--danger);color:var(--danger);">
           ✕ NEW PLAN (CLEAR ALL MISSION DATA)
         </button>
       </div>
@@ -1699,12 +1699,12 @@
         <div><span style="color:var(--muted);">FRAMEWORK</span> &nbsp; Tauri v1.6.3 · Vite · Vanilla JS ES Modules</div>
         <div><span style="color:var(--muted);">DATA SOURCES</span> &nbsp; CheckWX (METAR/TAF) · OpenAIP (Airspace) · SMHI (Observations)</div>
         <div style="margin-top:8px;">
-          <a href="#" onclick="window.openUrl('https://buymeacoffee.com/MissionDesk')" style="color:var(--accent);font-family:var(--mono);font-size:11px;">☕ Support MissionDesk development</a>
+          <a href="#" data-action="open-url" data-url="https://buymeacoffee.com/MissionDesk" style="color:var(--accent);font-family:var(--mono);font-size:11px;">☕ Support MissionDesk development</a>
         </div>
       </div>
 
       <div class="btn-row" style="margin-top:32px;">
-        <button class="btn btn-secondary" onclick="window.goTo(10)">← OFP FLIGHT PLAN</button>
+        <button class="btn btn-secondary" data-goto="10">← OFP FLIGHT PLAN</button>
       </div>
     </div>
 
@@ -1715,6 +1715,16 @@
 <script src="js/app.js"></script>
 <script src="js/maps.js"></script>
 <script src="js/pdf.js"></script>
+
+<!--
+  pdf.js loader. The vendored pdf.js 6.x ships as an ES module, so we import it
+  here and expose it as the global window.pdfjsLib that the classic-script code
+  in app.js (window.processPDF) already expects. The worker source is pinned to
+  the version-matched vendored worker — this REPLACES the old CDN workerSrc
+  assignment that used to live in app.js. Module scripts are deferred, so this
+  runs before DOMContentLoaded and well before any user PDF upload.
+-->
+<script type="module" src="js/pdf-init.js"></script>
 
 </body>
 </html>

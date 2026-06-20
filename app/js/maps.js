@@ -43,7 +43,7 @@ window.refreshAllMaps = function() {
   }
 
   // Give the user a green blinking confirmation on the button
-  const btn = document.querySelector('button[onclick="window.refreshAllMaps()"]');
+  const btn = document.querySelector('[data-action="refresh-all-maps"]');
   if (btn) {
     const oldTxt = btn.textContent;
     btn.textContent = '✓ MAPS REFRESHED';

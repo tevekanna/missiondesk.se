@@ -141,6 +141,42 @@ window.escHtml = function(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 };
 
+// --- INPUT / FILE-IMPORT SAFETY LIMITS ---
+// Hard caps used to reject pathological imports before they reach the parsers.
+window.MAX_IMPORT_BYTES = 8 * 1024 * 1024;   // 8 MB — waypoint / .plan / .dbrf text files
+window.MAX_PDF_BYTES    = 50 * 1024 * 1024;  // 50 MB — PDF chart uploads
+window.MAX_WAYPOINTS    = 2000;              // sane ceiling on imported nav points / vertices
+
+// Returns true only for a finite, in-range WGS-84 coordinate pair.
+window.isValidLatLon = function(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) &&
+         lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+};
+
+// Drops out-of-range / non-finite points and caps the collection size.
+// Returns { points, dropped, capped } so callers can report what happened.
+window.sanitisePoints = function(points, cap) {
+  cap = cap || window.MAX_WAYPOINTS;
+  const list = Array.isArray(points) ? points : [];
+  const valid = list.filter(p => p && window.isValidLatLon(Number(p.lat), Number(p.lon)));
+  const dropped = list.length - valid.length;
+  const capped = valid.length > cap;
+  return { points: capped ? valid.slice(0, cap) : valid, dropped, capped };
+};
+
+// Applies a default maxlength to every free-text field that doesn't already
+// declare one, preventing pathologically large strings from live typing.
+// Programmatic .value assignment (e.g. loading a .dbrf) bypasses maxlength,
+// so previously-saved data is never truncated — only manual entry is bounded.
+window.applyInputSafetyLimits = function() {
+  document.querySelectorAll('input[type="text"], input:not([type])').forEach(el => {
+    if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '1000');
+  });
+  document.querySelectorAll('textarea').forEach(el => {
+    if (!el.hasAttribute('maxlength')) el.setAttribute('maxlength', '50000');
+  });
+};
+
 window._debounce = function(fn, ms) {
   let t; return function(...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); };
 };
@@ -393,9 +429,8 @@ window.showDroneSuggestions = function(val) {
     const typeIcon  = d.type === 'fixed-wing' ? '✈ ' : d.type === 'fixed-wing-vtol' ? '✈⬆ ' : '🚁 ';
     const typeColor = (d.type||'').includes('fixed-wing') ? 'var(--ok)' : 'var(--accent)';
     return `
-    <div onclick="window.applyDroneSpec('${d.key}')"
-      style="padding:8px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border);"
-      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+    <div class="drone-suggestion-item" data-drone-key="${d.key}"
+      style="padding:8px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border);">
       <span style="color:${typeColor}">${typeIcon}</span><strong>${d.name}</strong>
       <span style="color:var(--muted);margin-left:8px;">${window.fmt(d.dim,2)} m · ${window.fmt(d.mtom,3)} kg · EU ${d.euClass}</span>
     </div>`;
@@ -705,15 +740,61 @@ window.updateDimHint = function() {
   }
 };
 
+// Validates the numeric inputs that feed the SORA ground/air-risk engine.
+// Rejects missing required fields, non-finite values, negatives and absurd
+// magnitudes. The SORA scope ceilings (>40 m / >200 m/s) are intentionally NOT
+// rejected here — those are valid edge cases the engine itself reports as
+// "outside SORA scope". Returns { ok, dim, speed, mass, message }.
+window._validateSoraNumeric = function(dimRaw, speedRaw, massRaw) {
+  if (dimRaw === '' || speedRaw === '') {
+    return { ok: false, message: 'Enter characteristic dimension and max speed to calculate SAIL.' };
+  }
+  const dim = parseFloat(dimRaw), speed = parseFloat(speedRaw);
+  if (!Number.isFinite(dim) || dim <= 0 || dim > 1000) {
+    return { ok: false, message: 'Characteristic dimension must be a positive number in metres.' };
+  }
+  if (!Number.isFinite(speed) || speed <= 0 || speed > 2000) {
+    return { ok: false, message: 'Max speed must be a positive number in m/s.' };
+  }
+  let mass = null;
+  if (massRaw !== '') {
+    const m = parseFloat(massRaw);
+    // A negative/zero/absurd MTOM would, among other things, wrongly trigger the
+    // ≤250 g iGRC=1 special case — reject it rather than guess.
+    if (!Number.isFinite(m) || m <= 0 || m > 100000) {
+      return { ok: false, message: 'MTOM must be a positive number in kg, or left blank.' };
+    }
+    mass = m;
+  }
+  return { ok: true, dim, speed, mass };
+};
+
+// Shows a caution in the SAIL result area and clears stale risk values so a bad
+// input never leaves a previously-computed SAIL on screen.
+function _showSailCaution(message) {
+  const sn = document.getElementById('sail-num');
+  if (sn) { sn.textContent = '⚠ ' + message; sn.style.color = 'var(--warn)'; }
+  ['igrc-val','grc-val','arc-val'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '–'; });
+  window.sailResult = { grc: 0, iGRC: 0, arc: 0, sail: 0, grcLabel: '–', arcLabel: '–' };
+}
+
 window.calcSAIL25 = function() {
   window._sailCalculated = true;
   const warn = document.getElementById('stale-warn-sail'); if (warn) warn.style.display = 'none';
 
   // --- Gather inputs ---
   const popEl   = document.querySelector('input[name="pop"]:checked');
-  const dimVal  = parseFloat(document.getElementById('igrc-dim')?.value   || document.getElementById('drone-dim')?.value)   || 0.6;
-  const speedVal= parseFloat(document.getElementById('igrc-speed')?.value || document.getElementById('drone-speed')?.value) || 15;
-  const massKg  = parseFloat(document.getElementById('drone-mtom')?.value) || null;
+
+  // Runtime input guard — never feed garbage to the SORA engine. Read the raw
+  // strings (not parsed fallbacks) so "missing" can be told from "invalid".
+  const dimRaw   = (document.getElementById('igrc-dim')?.value   || document.getElementById('drone-dim')?.value   || '').trim();
+  const speedRaw = (document.getElementById('igrc-speed')?.value || document.getElementById('drone-speed')?.value || '').trim();
+  const massRaw  = (document.getElementById('drone-mtom')?.value || '').trim();
+  const guard = window._validateSoraNumeric(dimRaw, speedRaw, massRaw);
+  if (!guard.ok) { _showSailCaution(guard.message); return; }
+  const dimVal  = guard.dim;
+  const speedVal= guard.speed;
+  const massKg  = guard.mass; // kg, or null when blank
 
   // Sync igrc-dim from drone-dim if the SORA field is still empty
   if (document.getElementById('igrc-dim') && document.getElementById('drone-dim')) {
@@ -987,33 +1068,33 @@ window.renderWaypointList = function() {
     const coordHint = coordOk ? `✓ ${parsed.lat.toFixed(6)}, ${parsed.lon.toFixed(6)}` : (wp.coords ? '✗ Invalid format' : '');
 
     const row = document.createElement('div');
-	
+    row.dataset.wpIndex = i;
+
     // Add a 40px column for the OFP checkbox
     row.style.cssText = 'display:grid;grid-template-columns:28px 1fr 60px 100px 40px auto;gap:6px;align-items:start;margin-bottom:10px;';
 
     row.innerHTML = `
       <span style="font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:8px;text-align:center;">${icon}</span>
       <div>
-        <input type="text" value="${window.escHtml(wp.coords)}"
+        <input type="text" value="${window.escHtml(wp.coords)}" maxlength="120" data-wp-field="coords"
           placeholder="Paste coordinates in any supported format"
-          oninput="window.waypoints[${i}].coords=this.value; window.updateWpFeedback(${i},this); window._debounce(window.updateWaypointPreview,200)();"
           style="width:100%;font-family:var(--mono);font-size:11px;padding:6px 8px;border:1px solid ${coordColor};border-radius:3px;background:var(--surface);">
         <div id="wp-hint-${i}" style="font-family:var(--mono);font-size:9px;color:${coordColor};margin-top:2px;">${coordHint}</div>
       </div>
-      <input type="number" value="${window.escHtml(wp.alt)}" placeholder="Alt m" oninput="window.waypoints[${i}].alt=this.value; window._debounce(window.updateWaypointPreview,200)();"
+      <input type="number" value="${window.escHtml(wp.alt)}" placeholder="Alt m" data-wp-field="alt"
         style="font-family:var(--mono);font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:3px;background:var(--surface);" lang="en">
-      <input type="text" value="${window.escHtml(wp.name)}" placeholder="Name (optional)" oninput="window.waypoints[${i}].name=this.value; window._debounce(window.updateWaypointPreview,200)();"
+      <input type="text" value="${window.escHtml(wp.name)}" maxlength="80" placeholder="Name (optional)" data-wp-field="name"
         style="font-family:var(--mono);font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:3px;background:var(--surface);">
-      
+
       <div style="display:flex;flex-direction:column;align-items:center;padding-top:4px;" title="Force include this waypoint in the OFP">
-        <input type="checkbox" ${wp.forceOfp ? 'checked' : ''} onchange="window.waypoints[${i}].forceOfp=this.checked;" style="width:14px;height:14px;cursor:pointer;">
+        <input type="checkbox" ${wp.forceOfp ? 'checked' : ''} data-wp-field="forceOfp" style="width:14px;height:14px;cursor:pointer;">
         <span style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;">OFP</span>
       </div>
 
       <div style="display:flex;gap:4px;padding-top:4px;">
-        ${i > 0 ? `<button onclick="window.moveWaypoint(${i},-1)" title="Move up" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--border);background:var(--surface2);border-radius:3px;cursor:pointer;">↑</button>` : '<span style="width:27px;"></span>'}
-        ${i < window.waypoints.length-1 ? `<button onclick="window.moveWaypoint(${i},1)" title="Move down" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--border);background:var(--surface2);border-radius:3px;cursor:pointer;">↓</button>` : '<span style="width:27px;"></span>'}
-        <button onclick="window.removeWaypoint(${i})" title="Remove" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--danger);color:var(--danger);background:rgba(198,40,40,0.06);border-radius:3px;cursor:pointer;">✕</button>
+        ${i > 0 ? `<button data-wp-action="move-up" title="Move up" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--border);background:var(--surface2);border-radius:3px;cursor:pointer;">↑</button>` : '<span style="width:27px;"></span>'}
+        ${i < window.waypoints.length-1 ? `<button data-wp-action="move-down" title="Move down" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--border);background:var(--surface2);border-radius:3px;cursor:pointer;">↓</button>` : '<span style="width:27px;"></span>'}
+        <button data-wp-action="remove" title="Remove" style="font-family:var(--mono);font-size:10px;padding:4px 7px;border:1px solid var(--danger);color:var(--danger);background:rgba(198,40,40,0.06);border-radius:3px;cursor:pointer;">✕</button>
       </div>
     `;
     frag.appendChild(row);
@@ -1073,7 +1154,13 @@ window.parseBulkWaypoints = function() {
     const name = alt ? remParts.slice(1).join(', ') : remParts.join(', ');
     parsed.push({ coords: coordStr.trim(), lat: p.lat, lon: p.lon, alt, name });
   });
-  if (parsed.length > 0) { window.waypoints = parsed; window.renderWaypointList(); document.getElementById('waypoint-import-box').style.display = 'none'; document.getElementById('waypoint-bulk').value = ''; }
+  const clean = window.sanitisePoints(parsed, window.MAX_WAYPOINTS);
+  if (clean.points.length > 0) {
+    window.waypoints = clean.points; window.renderWaypointList();
+    document.getElementById('waypoint-import-box').style.display = 'none';
+    document.getElementById('waypoint-bulk').value = '';
+    if (clean.dropped || clean.capped) alert(`${clean.dropped} out-of-range waypoint(s) dropped${clean.capped ? `; list capped at ${window.MAX_WAYPOINTS}` : ''}.`);
+  }
   else { alert('No valid coordinates found.'); }
 };
 
@@ -1108,20 +1195,28 @@ window.parseQGCWPL = function(lines) {
 };
 
 window.parseQGCPlan = function(json) {
+  // Validate the parsed JSON has the shape we expect before trusting any field.
+  if (!json || typeof json !== 'object') throw new Error('Plan file is not a valid JSON object.');
   const items = json?.mission?.items || json?.items || [];
+  if (!Array.isArray(items)) throw new Error('Plan file has no recognisable mission items.');
   const home  = json?.mission?.plannedHomePosition || json?.plannedHomePosition;
+  const homeValid = Array.isArray(home) && home.length >= 2 && window.isValidLatLon(Number(home[0]), Number(home[1]));
   const result = []; let skipped = 0;
-  if (home && Array.isArray(home) && home.length >= 2) { result.push({ coords: `${home[0].toFixed(7)}, ${home[1].toFixed(7)}`, lat: home[0], lon: home[1], alt: Math.round(home[2]||0), name: 'HOME' }); }
+  if (homeValid) {
+    const hlat = Number(home[0]), hlon = Number(home[1]);
+    result.push({ coords: `${hlat.toFixed(7)}, ${hlon.toFixed(7)}`, lat: hlat, lon: hlon, alt: Math.round(Number(home[2]) || 0), name: 'HOME' });
+  }
   items.forEach((item, i) => {
-    if (item.type === 'SimpleItem') {
+    if (item && item.type === 'SimpleItem') {
       const cmd = item.command;
       if (!WP_NAV_CMDS.has(cmd)) { skipped++; return; }
-      const lat = parseFloat(item.params[4] ?? item.coordinate?.[0]), lon = parseFloat(item.params[5] ?? item.coordinate?.[1]), alt = parseFloat(item.params[6] ?? item.coordinate?.[2]) || 0;
-      if (isNaN(lat) || isNaN(lon)) { skipped++; return; }
+      const params = Array.isArray(item.params) ? item.params : [];
+      const lat = parseFloat(params[4] ?? item.coordinate?.[0]), lon = parseFloat(params[5] ?? item.coordinate?.[1]), alt = parseFloat(params[6] ?? item.coordinate?.[2]) || 0;
+      if (!window.isValidLatLon(lat, lon)) { skipped++; return; }
       result.push({ coords: `${lat.toFixed(7)}, ${lon.toFixed(7)}`, lat, lon, alt: Math.round(alt), name: `${WP_CMD_NAMES[cmd]||'WP'}-${i+1}` });
     } else { skipped++; }
   });
-  return { format: 'QGC Plan JSON', waypoints: result, home: home ? {lat:home[0],lon:home[1]} : null, skipped };
+  return { format: 'QGC Plan JSON', waypoints: result, home: homeValid ? {lat:Number(home[0]),lon:Number(home[1])} : null, skipped };
 };
 
 window.parseLitchiCSV = function(lines) {
@@ -1141,7 +1236,12 @@ window.parseLitchiCSV = function(lines) {
 window.parseWaypointFile = function(text, filename) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('//'));
   if (lines[0]?.startsWith('QGC WPL')) return window.parseQGCWPL(lines);
-  if (lines[0]?.startsWith('{')) return window.parseQGCPlan(JSON.parse(lines.join('\n')));
+  if (lines[0]?.startsWith('{')) {
+    let parsed;
+    try { parsed = JSON.parse(lines.join('\n')); }
+    catch (e) { throw new Error('Mission file contains invalid JSON.'); }
+    return window.parseQGCPlan(parsed);
+  }
   if (lines[0]?.toLowerCase().includes('latitude')) return window.parseLitchiCSV(lines);
   throw new Error(`Unknown file format.`);
 };
@@ -1174,12 +1274,19 @@ window.parseQGCRally = function(text) {
 window.quickLoadMission = function(inputEl) {
   const file = inputEl.files?.[0]; if (!file) return;
   const ql = document.getElementById('ql-status'); ql.style.color = 'var(--accent)'; ql.textContent = `⟳ Reading ${file.name}…`;
+  if (file.size > window.MAX_IMPORT_BYTES) {
+    ql.style.color = 'var(--danger)';
+    ql.textContent = `✗ File too large (${(file.size/1048576).toFixed(1)} MB). Limit is ${window.MAX_IMPORT_BYTES/1048576} MB.`;
+    inputEl.value = ''; return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const result = window.parseWaypointFile(e.target.result, file.name);
       if (result.waypoints.length === 0) { ql.style.color = 'var(--warn)'; ql.textContent = `⚠ No navigation waypoints found.`; return; }
-      window.waypoints = result.waypoints;
+      const clean = window.sanitisePoints(result.waypoints, window.MAX_WAYPOINTS);
+      if (clean.points.length === 0) { ql.style.color = 'var(--warn)'; ql.textContent = `⚠ No valid in-range coordinates found.`; return; }
+      window.waypoints = clean.points;
       const opFlightEl = document.getElementById('op-flighttype');
       if (opFlightEl && opFlightEl.value !== 'autonomt') { opFlightEl.value = 'autonomt'; opFlightEl.dispatchEvent(new Event('change')); }
       document.getElementById('waypoint-section').style.display = 'block';
@@ -1192,6 +1299,10 @@ window.quickLoadMission = function(inputEl) {
       if(typeof window.renderWaypointList === 'function') window.renderWaypointList(); 
       if(typeof window.recalcFlightTime === 'function') window.recalcFlightTime();
       if (document.getElementById('op-type')?.value === 'leverans' && typeof window.autoFillDeliveryCoords === 'function') window.autoFillDeliveryCoords();
+      if (clean.dropped || clean.capped) {
+        ql.style.color = 'var(--warn)';
+        ql.textContent += `\n⚠ ${clean.dropped} out-of-range point(s) dropped${clean.capped ? `; list capped at ${window.MAX_WAYPOINTS}` : ''}.`;
+      }
     } catch(err) { ql.style.color = 'var(--danger)'; ql.textContent = `✗ Error: ${err.message}`; }
     inputEl.value = '';
   };
@@ -1200,30 +1311,58 @@ window.quickLoadMission = function(inputEl) {
 
 window.quickLoadFence = function(inputEl) {
   const file = inputEl.files?.[0]; if (!file) return;
+  const ql = document.getElementById('ql-status');
+  if (file.size > window.MAX_IMPORT_BYTES) {
+    if (ql) { ql.style.color = 'var(--danger)'; ql.textContent = `✗ Fence file too large (limit ${window.MAX_IMPORT_BYTES/1048576} MB).`; }
+    inputEl.value = ''; return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const result = window.parseQGCFence(e.target.result);
-      window.fencePoints = result.points;
-      window._loadedFiles.fence = `${file.name} (${result.points.length} vertices)`;
+      const clean = window.sanitisePoints(result.points, window.MAX_WAYPOINTS);
+      window.fencePoints = clean.points;
+      window._loadedFiles.fence = `${file.name} (${clean.points.length} vertices)`;
       window.updateQLStatus();
+      if ((clean.dropped || clean.capped) && ql) {
+        ql.style.color = 'var(--warn)';
+        ql.textContent += `\n⚠ Fence: ${clean.dropped} invalid vertex(es) dropped${clean.capped ? `; capped at ${window.MAX_WAYPOINTS}` : ''}.`;
+      }
       if (typeof window.updateWaypointPreview === 'function') window.updateWaypointPreview();
-    } catch(err) {} inputEl.value = '';
+    } catch(err) {
+      // Previously a silent empty catch — now surface the failure to the user.
+      if (ql) { ql.style.color = 'var(--danger)'; ql.textContent = `✗ Fence import failed: ${err.message}`; }
+    }
+    inputEl.value = '';
   };
   reader.readAsText(file);
 };
 
 window.quickLoadRally = function(inputEl) {
   const file = inputEl.files?.[0]; if (!file) return;
+  const ql = document.getElementById('ql-status');
+  if (file.size > window.MAX_IMPORT_BYTES) {
+    if (ql) { ql.style.color = 'var(--danger)'; ql.textContent = `✗ Rally file too large (limit ${window.MAX_IMPORT_BYTES/1048576} MB).`; }
+    inputEl.value = ''; return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const result = window.parseQGCRally(e.target.result);
-      window.rallyPoints = result.points;
-      window._loadedFiles.rally = `${file.name} (${result.points.length} pts)`;
+      const clean = window.sanitisePoints(result.points, window.MAX_WAYPOINTS);
+      window.rallyPoints = clean.points;
+      window._loadedFiles.rally = `${file.name} (${clean.points.length} pts)`;
       window.updateQLStatus();
+      if ((clean.dropped || clean.capped) && ql) {
+        ql.style.color = 'var(--warn)';
+        ql.textContent += `\n⚠ Rally: ${clean.dropped} invalid point(s) dropped${clean.capped ? `; capped at ${window.MAX_WAYPOINTS}` : ''}.`;
+      }
       if (typeof window.updateWaypointPreview === 'function') window.updateWaypointPreview();
-    } catch(err) {} inputEl.value = '';
+    } catch(err) {
+      // Previously a silent empty catch — now surface the failure to the user.
+      if (ql) { ql.style.color = 'var(--danger)'; ql.textContent = `✗ Rally import failed: ${err.message}`; }
+    }
+    inputEl.value = '';
   };
   reader.readAsText(file);
 };
@@ -1409,7 +1548,7 @@ window.renderSMHIAssessment = function(ws, vis, tcc, temp, pm, rh, validTime) {
     const badgeCls = !c.ok ? 'badge-danger' : c.warn ? 'badge-warn' : 'badge-ok';
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
       <span style="font-family:var(--mono);font-size:10px;color:var(--muted);min-width:170px;flex-shrink:0;">${c.label}:</span>
-      <span style="font-family:var(--mono);font-size:11px;font-weight:bold;min-width:70px;flex-shrink:0;color:${!c.ok?'var(--danger)':c.warn?'var(--warn)':'var(--ok)'};">${c.value}</span>
+      <span style="font-family:var(--mono);font-size:11px;font-weight:bold;min-width:70px;flex-shrink:0;color:${!c.ok?'var(--danger)':c.warn?'var(--warn)':'var(--ok)'};">${window.escHtml(c.value)}</span>
       <div style="flex-shrink:0;"><span class="status-badge ${badgeCls}">${badge}</span></div>
       <span style="font-size:11px;color:var(--muted);">${c.msg}</span>
     </div>`;
@@ -1614,17 +1753,17 @@ window.updateRadioFreqUI = function() {
 
   const rows = airports.map((ap, i) => {
     const freqs = [];
-    if (ap.twr)  freqs.push('TWR: ' + ap.twr);
-    if (ap.gnd)  freqs.push('GND: ' + ap.gnd);
-    if (ap.app)  freqs.push('APP: ' + ap.app);
-    if (ap.atis) freqs.push('ATIS: ' + ap.atis);
-    if (ap.info) freqs.push('INFO: ' + ap.info);
-    if (ap.mil)  freqs.push('MIL: ' + ap.mil);
+    if (ap.twr)  freqs.push('TWR: ' + window.escHtml(ap.twr));
+    if (ap.gnd)  freqs.push('GND: ' + window.escHtml(ap.gnd));
+    if (ap.app)  freqs.push('APP: ' + window.escHtml(ap.app));
+    if (ap.atis) freqs.push('ATIS: ' + window.escHtml(ap.atis));
+    if (ap.info) freqs.push('INFO: ' + window.escHtml(ap.info));
+    if (ap.mil)  freqs.push('MIL: ' + window.escHtml(ap.mil));
     
     return `
       <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:${i === airports.length-1 ? 'none' : '1px solid var(--border)'};">
         <div style="font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--accent);">
-          ${ap.icao} - ${ap.name} <span style="color:var(--text);font-weight:normal;">(${ap.dist.toFixed(1)} km)</span>
+          ${window.escHtml(ap.icao)} - ${window.escHtml(ap.name)} <span style="color:var(--text);font-weight:normal;">(${ap.dist.toFixed(1)} km)</span>
         </div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--text);margin-top:4px;">
           ${freqs.join(' &nbsp;|&nbsp; ')}
@@ -1657,8 +1796,8 @@ window.renderMetarTafResult = function(metars, tafMap, pts, fetchTime, failed = 
     const taf = tafMap[m.icaoId] ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--muted);font-family:monospace;font-size:11px;">TAF: ${window.escHtml(tafMap[m.icaoId].rawTAF)}</div>` : '';
     return `<div style="margin-bottom:8px;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:3px;">
       <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;font-weight:bold;margin-bottom:4px;">
-        <span>${m.icaoId} - ${m.name || 'Station'}</span>
-        <span style="color:${m.flightCategory === 'VFR' ? 'var(--ok)' : 'var(--warn)'}">${m.flightCategory || 'N/A'}</span>
+        <span>${window.escHtml(m.icaoId)} - ${window.escHtml(m.name || 'Station')}</span>
+        <span style="color:${m.flightCategory === 'VFR' ? 'var(--ok)' : 'var(--warn)'}">${window.escHtml(m.flightCategory || 'N/A')}</span>
       </div>
       <div style="font-family:monospace;font-size:11px;">${window.escHtml(m.rawOb)}</div>
       ${taf}
@@ -1716,7 +1855,7 @@ window.fetchOpenMeteo = async function() {
 
   btn.disabled = true;
   btn.textContent = '⟳ Fetching...';
-  tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:var(--muted);">Fetching METAR & Forecast for ${airportIcao || 'target location'}...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:var(--muted);">Fetching METAR & Forecast for ${airportIcao ? window.escHtml(airportIcao) : 'target location'}...</td></tr>`;
 
   try {
     let metarData = null;
@@ -1762,12 +1901,12 @@ window.fetchOpenMeteo = async function() {
       
       html += `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:4px 6px;font-weight:bold;">${tStr}</td>
-        <td style="padding:4px 6px;">${temp}</td>
+        <td style="padding:4px 6px;">${window.escHtml(temp)}</td>
         <td style="padding:4px 6px;color:${windColor};font-weight:${wind > 5 ? 'bold' : 'normal'}">${wind.toFixed(1)}</td>
         <td style="padding:4px 6px;color:${gustColor};">${gust.toFixed(1)}</td>
-        <td style="padding:4px 6px;">${prec}</td>
-        <td style="padding:4px 6px;">${cloud}</td>
-        <td style="padding:4px 6px;">${visi}</td>
+        <td style="padding:4px 6px;">${window.escHtml(prec)}</td>
+        <td style="padding:4px 6px;">${window.escHtml(cloud)}</td>
+        <td style="padding:4px 6px;">${window.escHtml(visi)}</td>
       </tr>`;
     });
     
@@ -1849,7 +1988,7 @@ window.fetchOpenMeteo = async function() {
     if(typeof window.updateWindKt === 'function') window.updateWindKt();
     
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:var(--danger);">Error fetching data: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:var(--danger);">Error fetching data: ${window.escHtml(err.message)}</td></tr>`;
   } finally {
     btn.disabled = false; btn.textContent = '⟳ Fetch Weather Data';
   }
@@ -1988,8 +2127,8 @@ window.addTemRow = function(type, val1 = '', val2 = '', prob = '', sev = '') {
     <textarea class="tem-val2 auto-expand" placeholder="How will you mitigate this?" style="width:100%;font-family:var(--sans);font-size:calc(12px + var(--tz));padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);resize:none;overflow:hidden;min-height:30px;line-height:1.4;">${window.escHtml(val2)}</textarea>
     ${probSelect}
     <div style="display:flex;gap:4px;align-items:stretch;height:100%;min-height:30px;">
-      <button class="btn btn-secondary" onclick="window.addTemRow('${type}')" style="padding:0 12px;font-size:16px;border-color:var(--accent);color:var(--accent);height:100%;" title="Add row">+</button>
-      <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove()" style="padding:0 12px;font-size:14px;border-color:var(--danger);color:var(--danger);background:rgba(198,40,40,0.06);height:100%;" title="Remove row">✕</button>
+      <button class="btn btn-secondary" data-tem-action="add" data-tem-type="${type}" style="padding:0 12px;font-size:16px;border-color:var(--accent);color:var(--accent);height:100%;" title="Add row">+</button>
+      <button class="btn btn-secondary" data-tem-action="remove" style="padding:0 12px;font-size:14px;border-color:var(--danger);color:var(--danger);background:rgba(198,40,40,0.06);height:100%;" title="Remove row">✕</button>
     </div>
   `;
   container.appendChild(row);
@@ -2226,10 +2365,18 @@ window.dbrfSave = async function() {
 
 window.dbrfLoad = function(inputEl) {
   const file = inputEl.files?.[0]; if (!file) return;
+  const statusEl = document.getElementById('dbrf-status');
+  if (file.size > window.MAX_IMPORT_BYTES) {
+    if (statusEl) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = `✗ Plan file too large (limit ${window.MAX_IMPORT_BYTES/1048576} MB).`; }
+    inputEl.value = ''; return;
+  }
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
+      let data;
+      try { data = JSON.parse(e.target.result); }
+      catch (pe) { throw new Error('Plan file is not valid JSON (.dbrf).'); }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Plan file has an unexpected structure.');
       Object.entries(data.fields || {}).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
       // Migrate radio values from pre-SORA-v2.5 .dbrf files to current values.
       // Old values were based on the incorrect iGRC matrix and mitigation scheme.
@@ -2298,10 +2445,10 @@ window.dbrfLoad = function(inputEl) {
         }
       });
 
-      window.waypoints = data.waypoints || []; 
-      window.fencePoints = data.fencePoints || []; 
-      window.rallyPoints = data.rallyPoints || [];
-	  window.ofpInputData = data.ofpInputData || {};
+      window.waypoints   = window.sanitisePoints(data.waypoints   || [], window.MAX_WAYPOINTS).points;
+      window.fencePoints = window.sanitisePoints(data.fencePoints || [], window.MAX_WAYPOINTS).points;
+      window.rallyPoints = window.sanitisePoints(data.rallyPoints || [], window.MAX_WAYPOINTS).points;
+	  window.ofpInputData = (data.ofpInputData && typeof data.ofpInputData === 'object') ? data.ofpInputData : {};
       
       window._loadedFiles = data.loadedFiles || { mission: '', fence: '', rally: '' };
       if(typeof window.updateQLStatus === 'function') window.updateQLStatus();
@@ -2336,9 +2483,12 @@ if(typeof window.updateHeaderMissionName === 'function') window.updateHeaderMiss
       if(typeof window.triggerAutoExpand === 'function') setTimeout(window.triggerAutoExpand, 100);
       if(typeof window.triggerAutoExpand === 'function') setTimeout(window.triggerAutoExpand, 100);
 
-      const s = document.getElementById('dbrf-status');
-      if (s) { s.style.color = 'var(--ok)'; s.textContent = `✓ Loaded: ${file.name}`; setTimeout(()=>s.textContent='', 4000); }
-    } catch(err) { alert('Failed to load plan.'); }
+      if (statusEl) { statusEl.style.color = 'var(--ok)'; statusEl.textContent = `✓ Loaded: ${file.name}`; setTimeout(()=>{ if (statusEl.textContent.startsWith('✓ Loaded')) statusEl.textContent=''; }, 4000); }
+    } catch(err) {
+      // Previously a generic, detail-free alert — now report the actual reason.
+      if (statusEl) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = `✗ Failed to load plan: ${err.message}`; }
+      else alert('Failed to load plan: ' + err.message);
+    }
     inputEl.value = '';
   };
   reader.readAsText(file);
@@ -2392,6 +2542,14 @@ window.processImage = function(file) {
 };
 
 window.processPDF = async function(file) {
+  if (file.size > window.MAX_PDF_BYTES) {
+    alert(`PDF too large (${(file.size/1048576).toFixed(1)} MB). Limit is ${window.MAX_PDF_BYTES/1048576} MB.`);
+    return;
+  }
+  if (typeof pdfjsLib === 'undefined') {
+    alert('The PDF engine has not finished loading — please try again in a moment.');
+    return;
+  }
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -2418,11 +2576,11 @@ window.renderChartGallery = function() {
   if (!gallery) return;
   gallery.innerHTML = window.uploadedCharts.map((chart, idx) => `
     <div style="border:1px solid var(--border); border-radius:4px; overflow:hidden; background:var(--surface); display:flex; flex-direction:column; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-      <div onclick="window.showChartFullscreen(${idx})" title="Click to view full size" style="height:160px; background-image:url('${chart.base64}'); background-size:contain; background-position:center; background-repeat:no-repeat; background-color:#fff; cursor:zoom-in; transition:opacity 0.2s;" onmouseover="this.style.opacity=0.7" onmouseout="this.style.opacity=1"></div>
+      <div class="chart-thumb" data-chart-action="fullscreen" data-chart-idx="${idx}" title="Click to view full size" style="height:160px; background-image:url('${window.escHtml(chart.base64)}'); background-size:contain; background-position:center; background-repeat:no-repeat; background-color:#fff; cursor:zoom-in; transition:opacity 0.2s;"></div>
       <div style="padding:8px; font-family:var(--mono); font-size:10px; color:var(--text); text-align:center; border-top:1px solid var(--border); word-break:break-all;">
         ${window.escHtml(chart.name)}
       </div>
-      <button onclick="window.removeChart(${idx})" style="background:rgba(198,40,40,0.06); color:var(--danger); border:none; border-top:1px solid var(--border); padding:8px; cursor:pointer; font-family:var(--mono); font-size:10px; font-weight:bold; transition:all 0.2s;" onmouseover="this.style.background='var(--danger)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(198,40,40,0.06)'; this.style.color='var(--danger)';">✕ REMOVE</button>
+      <button class="chart-remove-btn" data-chart-action="remove" data-chart-idx="${idx}" style="background:rgba(198,40,40,0.06); color:var(--danger); border:none; border-top:1px solid var(--border); padding:8px; cursor:pointer; font-family:var(--mono); font-size:10px; font-weight:bold; transition:all 0.2s;">✕ REMOVE</button>
     </div>
   `).join('');
 };
@@ -2646,23 +2804,356 @@ window.calcVolumes = function() {
   }
 };
 
+// --- EVENT DELEGATION ---
+// Shared delegation hub for declarative data-goto / data-action handlers. This is
+// the foundation for the CSP inline-handler refactor: later batches migrate more
+// on* handlers onto this hub by adding new kebab-case data-action values below.
+// One document-level listener resolves the clicked element via closest() so that
+// clicks landing on a child <span> still match the button that carries the attribute.
+window.initEventDelegation = function() {
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-goto],[data-action]');
+    if (!el) return;
+    if (el.dataset.goto !== undefined) { window.goTo(parseInt(el.dataset.goto, 10)); return; }
+    switch (el.dataset.action) {
+      case 'toggle-sidebar': window.toggleSidebar(); break;
+      case 'toggle-theme':   window.toggleTheme(); break;
+      case 'new-plan':       window.dbrfNewPlan(); break;
+      case 'save-plan':      window.dbrfSave(); break;
+      case 'open-plan':      document.getElementById('dbrf-open-input').click(); break;
+      case 'text-size':      window.adjustTextSize(parseInt(el.dataset.delta, 10)); break;
+      case 'open-url':       window.openUrl(el.dataset.url); break;
+      case 'generate-briefing': window.generateBriefing(); window.goTo(9); break;
+      case 'generate-ofp':      window.generateOFP(); window.goTo(10); break;
+      // --- Batch 2a (panel-0 / Step 1 DOI) ---
+      case 'trigger-input':     document.getElementById(el.dataset.target)?.click(); break;
+      case 'clear-quick-load':  window.clearQuickLoad(); break;
+      case 'recalc-flight-time': window.recalcFlightTime(); break;
+      case 'nrg-reset':         window.nrgResetToDefaults(); break;
+      case 'autofill-delivery': window.autoFillDeliveryCoords(); break;
+      case 'add-waypoint':      window.addWaypoint(); break;
+      case 'clear-waypoints':   window.clearWaypoints(); break;
+      case 'toggle-bulk-import': window.toggleBulkImport(); break;
+      case 'clear-fence':       window.clearFence(); break;
+      case 'open-lfv-map':      window.openLFVMap(); break;
+      case 'parse-bulk-waypoints': window.parseBulkWaypoints(); break;
+      case 'validate-next':     window.validateAndNext(parseInt(el.dataset.from, 10), parseInt(el.dataset.to, 10)); break;
+      // --- Batch 3 (panel-volume + panel-1) ---
+      case 'toggle-topo-map':       window.toggleTopoMap(); break;
+      case 'toggle-airspace-layer': window.toggleAirspaceLayer(); break;
+      case 'toggle-lfv-layer':      window.toggleLFVLayer(); break;   // distinct from 'open-lfv-map'
+      case 'toggle-pop-layer':      window.togglePopLayer(); break;
+      case 'recalc-sail-next':      window.calcSAIL25(); window.goTo(3); break;
+      // --- Batch 4 (panel-2 Containment, panel-3 OSO, panel-4 Weather & Airspace) ---
+      case 'assess-containment-next': window.assessContainment(); window.goTo(4); break;
+      case 'open-smhi':             window.openSMHI(); break;
+      case 'open-yr':               window.openYr(); break;
+      case 'open-windy':            window.openWindy(); break;
+      case 'autofill-weather-metar': window.autoFillWeatherFromNearestMetar(); break;
+      case 'fetch-open-meteo':      if (typeof window.fetchOpenMeteo === 'function') window.fetchOpenMeteo(); break;
+      case 'refresh-all-maps':      window.refreshAllMaps(); break;
+      case 'open-openaip':          window.openOpenAIP(); break;
+      case 'open-skyvector':        window.openSkyVector(); break;
+      case 'toggle-map-embed':      window.toggleMapEmbed(); break;
+      case 'fetch-all-route-wx':    window.fetchAllRouteWx(); break;
+      case 'clear-wx-data':         window.clearWxData(); break;
+      case 'update-radio-freq-ui':  window.updateRadioFreqUI(); break;
+      // --- Batch 5a (panel-5/6/7/8/9 + chart overlay + panel-11 Settings) ---
+      case 'add-common-threats':    window.addCommonThreats(); break;
+      case 'clear-charts':          window.clearCharts(); break;
+      case 'print-briefing-only':   window.printBriefingOnly(); break;
+      case 'print-ofp-only':        window.printOFPOnly(); break;
+      case 'close-chart-fullscreen': window.closeChartFullscreen(); break;
+      case 'test-checkwx-key':      window.testCheckWxKey(); break;
+      case 'settings-clear-api-keys': window.settingsClearApiKeys(); break;
+      case 'text-size-reset':       window.adjustTextSize(-window.currentTextOffset); break;
+      // Settings explicit light/dark theme buttons (distinct from header 'toggle-theme').
+      // Reproduces the original inline behaviour: set attribute, persist, sync the header icon.
+      case 'set-theme': {
+        const t = el.dataset.theme;
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('dbrf-theme', t);
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+        break;
+      }
+    }
+  });
+
+  // The .dbrf file input is wired directly (it carries an id, not a delegated action).
+  const dbrfInput = document.getElementById('dbrf-open-input');
+  if (dbrfInput) dbrfInput.addEventListener('change', () => window.dbrfLoad(dbrfInput));
+};
+
+// Field-level handlers for panel-0 (Step 1 DOI), migrated off inline oninput/
+// onchange/onfocus/onblur attributes (CSP inline-handler refactor, batch 2a).
+// Generated markup (drone-suggestions dropdown, renderWaypointList rows) is NOT
+// wired here — that is batch 2b.
+window.initPanel0FieldHandlers = function() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, () => fn(el)); };
+
+  // Quick-load file inputs
+  on('ql-mission-input', 'change', el => window.quickLoadMission(el));
+  on('ql-fence-input',   'change', el => window.quickLoadFence(el));
+  on('ql-rally-input',   'change', el => window.quickLoadRally(el));
+
+  // Date field
+  on('op-date', 'input', el => window.formatDateInput(el));
+
+  // UAS model search box (static input; suggestion items are batch 2b)
+  on('drone-model', 'focus', el => window.showDroneSuggestions(el.value));
+  on('drone-model', 'click', el => window.showDroneSuggestions(el.value));
+  on('drone-model', 'input', el => window.droneLookupDebounced(el.value));
+  on('drone-model', 'blur',  ()  => setTimeout(window.hideDroneSuggestions, 250));
+
+  // Characteristic dimension
+  on('drone-dim', 'input', () => window.updateDimHint());
+
+  // Flight-time inputs
+  on('drone-cruise',   'input', () => window.recalcFlightTime());
+  on('drone-wp-dwell', 'input', () => window.recalcFlightTime());
+
+  // Energy fields — mark edited (exact key) then recalc
+  [['nrg-setup','nrg-setup'], ['nrg-takeoff','nrg-takeoff'], ['nrg-cruise','nrg-cruise'],
+   ['nrg-descent','nrg-descent'], ['nrg-takeoff-min','nrg-takeoff-min'], ['nrg-descent-min','nrg-descent-min']]
+    .forEach(([id, key]) => on(id, 'input', () => { window.nrgMarkEdited(key); window.recalcEnergy(); }));
+  on('nrg-reserve', 'input', () => window.recalcEnergy());
+
+  // Operation / flight type selects
+  on('op-type',       'change', () => window.handleOpTypeChange());
+  on('op-flighttype', 'change', () => window.handleFlightTypeChange());
+
+  // Delivery coordinate fields — map + distance + flight-time chain
+  ['delivery-start-coords', 'delivery-dest-coords'].forEach(id =>
+    on(id, 'input', () => { window.updateDeliveryMap(); window.calcDeliveryDistance(); window.recalcFlightTime(); }));
+
+  // Waypoint / fence file inputs
+  on('wp-file-input',    'change', el => window.loadWaypointFile(el));
+  on('fence-file-input', 'change', el => window.loadFenceFile(el));
+
+  // ConOps UAS select
+  on('conops-uas-select', 'change', el => window.fillUasFromSelect(el.value));
+};
+
+// Delegated listeners for the two app.js-GENERATED lists (CSP inline-handler
+// refactor, batch 2b): the drone-suggestions dropdown and the waypoint rows.
+// Both render into PERSISTENT containers whose innerHTML is replaced on each
+// render, so these listeners are attached ONCE here — never inside the render
+// functions (which would stack a duplicate listener on every re-render).
+window.initGeneratedListDelegation = function() {
+  // --- Drone-suggestions dropdown (#drone-suggestions) ---
+  const dropdown = document.getElementById('drone-suggestions');
+  if (dropdown) {
+    dropdown.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-drone-key]');
+      if (item) window.applyDroneSpec(item.dataset.droneKey);
+    });
+  }
+
+  // --- Waypoint rows (#waypoint-list) ---
+  // Index is resolved from the row element's data-wp-index, never baked into
+  // per-row handlers, so it stays correct across re-renders/reordering.
+  const wpList = document.getElementById('waypoint-list');
+  if (wpList) {
+    const rowIndex = (el) => {
+      const row = el.closest('[data-wp-index]');
+      return row ? parseInt(row.dataset.wpIndex, 10) : -1;
+    };
+    wpList.addEventListener('input', (e) => {
+      const el = e.target;
+      const field = el.dataset.wpField;
+      if (!field) return;
+      const i = rowIndex(el);
+      if (i < 0 || !window.waypoints[i]) return;
+      if (field === 'coords') {
+        window.waypoints[i].coords = el.value;
+        window.updateWpFeedback(i, el);
+        window._debounce(window.updateWaypointPreview, 200)();
+      } else if (field === 'alt') {
+        window.waypoints[i].alt = el.value;
+        window._debounce(window.updateWaypointPreview, 200)();
+      } else if (field === 'name') {
+        window.waypoints[i].name = el.value;
+        window._debounce(window.updateWaypointPreview, 200)();
+      }
+    });
+    wpList.addEventListener('change', (e) => {
+      const el = e.target;
+      if (el.dataset.wpField !== 'forceOfp') return;
+      const i = rowIndex(el);
+      if (i < 0 || !window.waypoints[i]) return;
+      window.waypoints[i].forceOfp = el.checked;
+    });
+    wpList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-wp-action]');
+      if (!btn) return;
+      const i = rowIndex(btn);
+      if (i < 0) return;
+      switch (btn.dataset.wpAction) {
+        case 'move-up':   window.moveWaypoint(i, -1); break;
+        case 'move-down': window.moveWaypoint(i, 1);  break;
+        case 'remove':    window.removeWaypoint(i);   break;
+      }
+    });
+  }
+
+  // --- TEM rows (#tem-threats-container / #tem-errors-container) (batch 5b) ---
+  // Generated by addTemRow; the +/✕ buttons carry data-tem-action. The add button
+  // also carries data-tem-type so the new row matches its list; remove walks up to
+  // the enclosing .tem-row (reproduces the old parentElement.parentElement.remove()).
+  ['tem-threats-container', 'tem-errors-container'].forEach((id) => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-tem-action]');
+      if (!btn) return;
+      if (btn.dataset.temAction === 'add') window.addTemRow(btn.dataset.temType);
+      else if (btn.dataset.temAction === 'remove') btn.closest('.tem-row')?.remove();
+    });
+  });
+
+  // --- Chart gallery cards (#chart-gallery) (batch 5b) ---
+  // Generated by renderChartGallery; the thumbnail and remove button carry
+  // data-chart-action + data-chart-idx. Hover effects now live in CSS
+  // (.chart-thumb:hover / .chart-remove-btn:hover), not inline onmouseover/out.
+  const gallery = document.getElementById('chart-gallery');
+  if (gallery) {
+    gallery.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-chart-action]');
+      if (!el) return;
+      const idx = parseInt(el.dataset.chartIdx, 10);
+      if (el.dataset.chartAction === 'fullscreen') window.showChartFullscreen(idx);
+      else if (el.dataset.chartAction === 'remove') window.removeChart(idx);
+    });
+  }
+
+  // --- Editable OFP fields (#ofp-content) (batch 6) ---
+  // Generated by generateOFP; every editable field carries data-ofp. Semantics
+  // are preserved EXACTLY: standard fields, the actual-% field and the take-off
+  // field act on 'input'; the RETO/ATO time fields act on 'change' ONLY (no
+  // double-fire / no recalc per keystroke). saveOfpField is keyed by element id
+  // so edited values survive regeneration via window.ofpInputData.
+  const ofp = document.getElementById('ofp-content');
+  if (ofp) {
+    ofp.addEventListener('input', (e) => {
+      const el = e.target.closest('[data-ofp]');
+      if (!el) return;
+      const t = el.dataset.ofp;
+      if (t === 'save')              window.saveOfpField(el.id, el.value);
+      else if (t === 'save-actual') { window.saveOfpField(el.id, el.value); window.ofpRecalcActual(); }
+      else if (t === 'takeoff')      window.ofpUpdateTakeoff(el.value);
+      // 'save-reto' is change-only — intentionally ignored on input
+    });
+    ofp.addEventListener('change', (e) => {
+      const el = e.target.closest('[data-ofp]');
+      if (!el) return;
+      if (el.dataset.ofp === 'save-reto') {
+        window.saveOfpField(el.id, el.value);
+        window.ofpRecalcRETO(parseInt(el.dataset.ofpIdx, 10));
+      }
+    });
+  }
+};
+
+// Field handlers for panel-volume (Step 2) and panel-1 (Steps 2–7), migrated off
+// inline oninput/onchange attributes (CSP inline-handler refactor, batch 3). This
+// is the critical SORA path: volume inputs feed window.calcVolumes() and the
+// iGRC/ARC/SAIL controls feed window.calcSAIL25() (which keeps its own input guard).
+window.initBatch3FieldHandlers = function() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+
+  // panel-volume — 6 number inputs + 1 select, all recompute the operational volumes.
+  ['vol-speed', 'vol-wind', 'vol-height', 'vol-gps', 'vol-reaction', 'vol-latency']
+    .forEach(id => on(id, 'input', () => window.calcVolumes()));
+  on('vol-fts', 'change', () => window.calcVolumes());
+
+  // panel-1 — the two dimension/speed fields update the iGRC column hint.
+  on('igrc-dim',   'input', () => window.updateDimHint());
+  on('igrc-speed', 'input', () => window.updateDimHint());
+
+  // panel-1 — the 12 ARC/strategic/TMPR selects re-run the full SORA assessment.
+  ['arc-atypical', 'arc-above-fl600', 'arc-airport-env', 'arc-class-bcd', 'arc-above-150',
+   'arc-mode-s', 'arc-controlled', 'arc-urban', 'arc-authority-override',
+   'arc-local-density', 'arc-claim-atypical', 'arc-vlos']
+    .forEach(id => on(id, 'change', () => window.calcSAIL25()));
+};
+
+// Field handlers for panel-3 (Step 9 OSO) and panel-4 (Weather & Airspace),
+// migrated off inline onchange/oninput attributes (CSP inline-handler refactor,
+// batch 4). The two API-key fields reproduce their original inline behaviour
+// EXACTLY — same sanitisation rules and localStorage keys ('openaip_key' /
+// 'checkwx_key') — so saved keys keep loading on next start.
+window.initBatch4FieldHandlers = function() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, () => fn(el)); };
+
+  // panel-3 — OSO SAIL filter re-renders the OSO lists.
+  on('oso-sail-filter', 'change', () => window.renderOSO());
+
+  // panel-4 — wind speed field updates the knots conversion readout.
+  on('w-wind', 'input', () => window.updateWindKt());
+
+  // panel-4 — OpenAIP / CheckWX API keys use the shared helpers (same fields also
+  // exist on the Settings panel; see window.applyOpenAipKey / window.applyCheckWxKey).
+  on('openaip-api-key', 'input', el => window.applyOpenAipKey(el));
+  on('checkwx-api-key', 'input', el => window.applyCheckWxKey(el));
+};
+
+// Shared API-key field handlers. Both the Weather & Airspace panel (panel-4) and
+// the Settings panel (panel-11) expose OpenAIP / CheckWX key fields with identical
+// behaviour, so the logic lives here once. The sanitisation rules and localStorage
+// keys ('openaip_key' / 'checkwx_key') match the original inline handlers byte for
+// byte, so previously-saved keys keep loading on next start.
+window.applyOpenAipKey = function(el) {
+  const k = el.value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+  el.value = k;
+  try { localStorage.setItem('openaip_key', k); } catch (e) {}
+  window.syncApiKeys();
+  window.refreshAllMaps();
+};
+window.applyCheckWxKey = function(el) {
+  const k = el.value.trim();
+  el.value = k;
+  try { localStorage.setItem('checkwx_key', k); } catch (e) {}
+  window.syncApiKeys();
+};
+
+// Field handlers for the Charts panel (panel-7) and Settings panel (panel-11),
+// migrated off inline onchange/oninput attributes (CSP inline-handler refactor,
+// batch 5a). The Settings key fields reuse the shared helpers above.
+window.initBatch5FieldHandlers = function() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, () => fn(el)); };
+
+  // panel-7 — chart upload file input.
+  on('chart-upload-input', 'change', el => window.handleChartUpload(el));
+
+  // panel-11 — Settings OpenAIP / CheckWX API key fields (shared helpers).
+  on('settings-openaip-key', 'input', el => window.applyOpenAipKey(el));
+  on('settings-checkwx-key', 'input', el => window.applyCheckWxKey(el));
+};
+
 // --- INIT HOOKS ---
 document.addEventListener('DOMContentLoaded', () => {
+  // Wire the delegated nav/header/sidebar event hub.
+  window.initEventDelegation();
+  // Wire panel-0 (Step 1 DOI) field handlers migrated off inline attributes.
+  if (typeof window.initPanel0FieldHandlers === 'function') window.initPanel0FieldHandlers();
+  // Wire container-level delegation for the generated drone/waypoint lists.
+  if (typeof window.initGeneratedListDelegation === 'function') window.initGeneratedListDelegation();
+  // Wire panel-volume + panel-1 (SORA path) field handlers.
+  if (typeof window.initBatch3FieldHandlers === 'function') window.initBatch3FieldHandlers();
+  // Wire panel-3 (OSO) + panel-4 (Weather & Airspace) field handlers.
+  if (typeof window.initBatch4FieldHandlers === 'function') window.initBatch4FieldHandlers();
+  // Wire panel-7 (Charts) + panel-11 (Settings) field handlers.
+  if (typeof window.initBatch5FieldHandlers === 'function') window.initBatch5FieldHandlers();
+  // Bound every free-text field against pathologically large input.
+  if (typeof window.applyInputSafetyLimits === 'function') window.applyInputSafetyLimits();
   // Apply saved text size immediately
   document.documentElement.style.setProperty('--tz', window.currentTextOffset + 'px');
-  // Version display: Tauri injects {{APP_VERSION}} at build time for desktop.
-  // For the web/GitHub Pages version, we fall back to window.MISSIONDESK_VERSION from version.js.
-  // To release a new version: update version.js AND tauri.conf.json (package.version). That's it.
+  // Displayed version comes solely from app/js/version.js (window.MISSIONDESK_VERSION),
+  // read at runtime on both the Tauri desktop build and the web/GitHub Pages mirror.
+  // To change the displayed version: bump app/js/version.js. CI sets the build number there automatically.
   const versionEl = document.getElementById('app-version');
-  if (versionEl) {
-    if (versionEl.textContent && !versionEl.textContent.includes('APP_VERSION')) {
-      // Tauri desktop build: version already injected correctly — do nothing
-    } else {
-      // Web version (GitHub Pages or browser): use version.js
-      const webVersion = window.MISSIONDESK_VERSION || '?';
-      versionEl.textContent = 'v' + webVersion;
-    }
-  }
+  if (versionEl) versionEl.textContent = 'v' + (window.MISSIONDESK_VERSION || '?');
 
   // UX REDESIGN: Listen for changes that make the SORA calculation stale
   ['drone-dim', 'drone-speed', 'drone-model', 'pop-controlled', 'pop-sparse', 'pop-rural', 'pop-suburban', 'pop-urban', 'pop-crowd'].forEach(id => {
@@ -2677,9 +3168,10 @@ document.addEventListener('DOMContentLoaded', () => {
     missionNameInput.addEventListener('input', window.updateHeaderMissionName);
   }
   
-  if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
+  // pdf.js worker source is now set by the vendored ES-module loader in index.html
+  // (window.pdfjsLib + GlobalWorkerOptions.workerSrc). The old CDN assignment that
+  // lived here ran before the deferred module loaded and pointed at a stale worker,
+  // so it has been removed — see the <script type="module"> shim in index.html.
   if (typeof window.renderOSO === 'function') window.renderOSO();
   if (typeof window.initAutoExpand === 'function') window.initAutoExpand();
   if (typeof window.initAccordions === 'function') window.initAccordions();

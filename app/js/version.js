@@ -3,4 +3,4 @@
 // Update this file when releasing a new version.
 // This is read by both the Tauri desktop build and the GitHub Pages web version.
 // ==========================================
-window.MISSIONDESK_VERSION = '3.0.15';
+window.MISSIONDESK_VERSION = '3.1.1';
