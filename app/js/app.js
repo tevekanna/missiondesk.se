@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Lars Wallström
+
 // ==========================================
 // MISSIONDESK CORE APP LOGIC (UI, SORA, Weather, Files)
 // ==========================================
@@ -3151,9 +3154,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.style.setProperty('--tz', window.currentTextOffset + 'px');
   // Displayed version comes solely from app/js/version.js (window.MISSIONDESK_VERSION),
   // read at runtime on both the Tauri desktop build and the web/GitHub Pages mirror.
-  // To change the displayed version: bump app/js/version.js. CI sets the build number there automatically.
+  // To change the displayed version: bump app/js/version.js.
   const versionEl = document.getElementById('app-version');
   if (versionEl) versionEl.textContent = 'v' + (window.MISSIONDESK_VERSION || '?');
+  // AGPL section 13: the source link follows app/js/version.js (window.MISSIONDESK_SOURCE_URL).
+  const sourceEl = document.getElementById('source-link');
+  if (sourceEl && window.MISSIONDESK_SOURCE_URL) sourceEl.href = window.MISSIONDESK_SOURCE_URL;
 
   // UX REDESIGN: Listen for changes that make the SORA calculation stale
   ['drone-dim', 'drone-speed', 'drone-model', 'pop-controlled', 'pop-sparse', 'pop-rural', 'pop-suburban', 'pop-urban', 'pop-crowd'].forEach(id => {

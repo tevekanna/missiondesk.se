@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Lars Wallström
+
 // pdf.js loader (externalised from the inline module in index.html as the final
 // step of the CSP hardening, so script-src can drop 'unsafe-inline'). The vendored
 // pdf.js 6.x ships as an ES module: we import it and expose it as the global
