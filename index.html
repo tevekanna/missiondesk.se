@@ -719,7 +719,7 @@
       </div>
       <div style="text-align:center;">
         <a id="dlBtn"
-           href="https://github.com/tevekanna/missiondesk.se/releases/latest"
+           href="https://github.com/tevekanna/missiondesk/releases/latest"
            class="btn-download">
           <svg style="width:20px;height:20px;" viewBox="0 0 20 20" fill="none">
             <path d="M10 3v10M6 10l4 4 4-4M3 16h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -729,7 +729,7 @@
         </a>
         <div class="version-badge" id="versionBadge">v3.1.1</div>
         <div style="margin-top:0.75rem;">
-          <a href="https://github.com/tevekanna/missiondesk.se/releases" class="btn-secondary" style="font-size:11px;" data-i18n="dl.allReleases">
+          <a href="https://github.com/tevekanna/missiondesk/releases" class="btn-secondary" style="font-size:11px;" data-i18n="dl.allReleases">
             All releases on GitHub →
           </a>
         </div>
@@ -767,7 +767,7 @@
         <a href="#sora"        data-i18n="nav.sora">SORA v2.5</a>
         <a href="#regulations" data-i18n="nav.regulations">Regulations</a>
         <a href="#download"    data-i18n="nav.download">Download</a>
-        <a href="https://github.com/tevekanna/missiondesk.se" target="_blank" rel="noopener">GitHub →</a>
+        <a href="https://github.com/tevekanna/missiondesk" target="_blank" rel="noopener">GitHub →</a>
       </div>
     </div>
     <div class="footer-bottom">
@@ -985,7 +985,7 @@ async function fetchLatestRelease() {
   if (dlBtn) dlBtn.style.opacity = '0.4';
 
   try {
-    const res = await fetch('https://api.github.com/repos/tevekanna/missiondesk.se/releases/latest');
+    const res = await fetch('https://api.github.com/repos/tevekanna/missiondesk/releases/latest');
     if (!res.ok) throw new Error('no release');
     const data = await res.json();
 
@@ -1002,7 +1002,7 @@ async function fetchLatestRelease() {
   } catch {
     // API failed – fall back to the releases page; keep showing the app version
     if (dlBtn) {
-      dlBtn.href = 'https://github.com/tevekanna/missiondesk.se/releases/latest';
+      dlBtn.href = 'https://github.com/tevekanna/missiondesk/releases/latest';
       dlBtn.style.opacity = '1';
     }
     if (badge) badge.textContent = 'v' + APP_VERSION;
