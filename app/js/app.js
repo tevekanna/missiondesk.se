@@ -937,31 +937,66 @@ function _renderArcResultBox(r) {
   }
 }
 
+// Step #8 — required containment robustness.
+// The lookup lives in containment.js and follows AMC1 Article 11 of Regulation
+// (EU) 2019/947, point S.4.8.3 and Tables 8 to 13. The operator selects the
+// operational limits they commit to for the adjacent ground area; the tables
+// return the minimum robustness for the UA size class and the SAIL.
 window.assessContainment = function() {
-  const adjPop = document.getElementById('cont-adj-pop')?.value || 'suburban';
-  const assembly = document.getElementById('cont-assembly')?.value || 'no';
-  const level = document.querySelector('input[name="containment"]:checked')?.value || null;
-  const sail = window.sailResult.sail || 0;
+  const adjPop   = document.getElementById('cont-adj-pop')?.value || '';
+  const assembly = document.getElementById('cont-assembly')?.value || '';
+  const shelter  = document.getElementById('cont-shelter')?.value === 'yes';
+  const level    = document.querySelector('input[name="containment"]:checked')?.value || null;
+  const sail     = (window.sailResult && window.sailResult.sail) || 0;
   const resultEl = document.getElementById('containment-result');
+  if (!resultEl) return;
 
-  let minRequired = 'low';
-  if (sail >= 4 || adjPop === 'urban') minRequired = 'medium';
-  if (sail >= 5 || (adjPop === 'urban' && assembly === 'yes') || (assembly === 'yes' && sail >= 4)) minRequired = 'high';
+  const num = id => { const n = parseFloat(document.getElementById(id)?.value); return Number.isFinite(n) ? n : null; };
+  const dim    = num('igrc-dim')   ?? num('drone-dim');
+  const speed  = num('igrc-speed') ?? num('drone-speed');
+  const massKg = num('drone-mtom');
 
-  const levelOrder = {low:1, medium:2, high:3};
-  const selectedLevel = level ? levelOrder[level] : 0;
-  const requiredLevel = levelOrder[minRequired];
-  const adequate = selectedLevel >= requiredLevel;
+  const row = (key, val, cls = '') =>
+    `<div class="brief-row"><span class="brief-key">${key}</span><span class="brief-val ${cls}">${val}</span></div>`;
+
+  if (typeof window.computeContainment !== 'function' || dim === null || speed === null || dim <= 0 || speed <= 0) {
+    window.containmentResult = null;
+    resultEl.innerHTML = row('Status:', 'Enter characteristic dimension and max speed in Step 2 to assess containment.', 'warn');
+    return;
+  }
+
+  const r = window.computeContainment({
+    dimMeters:            dim,
+    speedMs:              speed,
+    massGrams:            massKg !== null ? massKg * 1000 : null,
+    sail,
+    adjPopDensity:        adjPop,
+    assemblySize:         assembly,
+    shelteringApplicable: shelter,
+  });
+  window.containmentResult = r;
 
   const levelNames = {low:'Low', medium:'Medium', high:'High'};
-  if(resultEl) resultEl.innerHTML = `
-    <div class="brief-row"><span class="brief-key">SAIL Level:</span><span class="brief-val">SAIL ${window.sailOrder ? window.sailOrder[sail-1] : sail}</span></div>
-    <div class="brief-row"><span class="brief-key">Adjacent population:</span><span class="brief-val">${adjPop}</span></div>
-    <div class="brief-row"><span class="brief-key">Crowd within 1 km:</span><span class="brief-val">${assembly === 'yes' ? 'Yes' : 'No'}</span></div>
-    <div class="brief-row"><span class="brief-key">Minimum required:</span><span class="brief-val warn">${levelNames[minRequired]}</span></div>
-    <div class="brief-row"><span class="brief-key">Selected level:</span><span class="brief-val ${adequate ? 'ok' : 'danger'}">${level ? levelNames[level] : 'Not selected'} <span class="status-badge ${adequate ? 'badge-ok' : 'badge-danger'}">${adequate ? '✓ ADEQUATE' : '✗ INADEQUATE'}</span></span></div>
-    ${!adequate ? '<div class="brief-row" style="margin-top:8px;"><span class="brief-key" style="color:var(--danger)">⚠ Increase containment robustness to at least: ' + levelNames[minRequired] + '</span></div>' : ''}
-  `;
+  const levelOrder = {low:1, medium:2, high:3};
+
+  let html = row('SAIL Level:', sail ? 'SAIL ' + (window.sailOrder ? window.sailOrder[sail-1] : sail) : '–');
+  html += row('Adjacent ground area:', r.adjacentAreaKm.toFixed(1) + ' km beyond the operational volume (3 min at max speed; min 5 km, max 35 km)');
+  if (r.tableRef) html += row('Source:', 'AMC1 Article 11 — ' + r.tableRef);
+
+  if (r.incomplete) {
+    html += row('Status:', r.note, 'warn');
+  } else if (r.outOfScope) {
+    html += row('Minimum required:', 'OUT OF SCOPE <span class="status-badge badge-danger">✗ NOT PERMITTED</span>', 'danger');
+    html += row('', r.outOfScopeGuidance);
+  } else {
+    html += row('Minimum required:', levelNames[r.robustness], 'warn');
+    r.operationalLimits.forEach((text, i) => { html += row(i === 0 ? 'Operational limits:' : '', text); });
+    if (r.note) html += row('Note:', r.note);
+    const adequate = !!level && levelOrder[level] >= r.robustnessIndex;
+    html += row('Selected level:', `${level ? levelNames[level] : 'Not selected'} <span class="status-badge ${adequate ? 'badge-ok' : 'badge-danger'}">${adequate ? '✓ ADEQUATE' : '✗ INADEQUATE'}</span>`, adequate ? 'ok' : 'danger');
+    if (!adequate) html += '<div class="brief-row" style="margin-top:8px;"><span class="brief-key" style="color:var(--danger)">⚠ Increase containment robustness to at least: ' + levelNames[r.robustness] + '</span></div>';
+  }
+  resultEl.innerHTML = html;
 };
 
 window.renderOSO = function() {
@@ -975,6 +1010,9 @@ window.renderOSO = function() {
       const sailIdx = window.sailOrder ? window.sailOrder.indexOf(filterSail) : 0;
       const osoMinIdx = window.sailOrder ? window.sailOrder.indexOf(oso.minSail) : 0;
       const dimmed = filterSail !== 'all' && sailIdx < osoMinIdx;
+      // Required robustness for the selected SAIL [AMC1 Article 11, Table 14]
+      const robCode  = (filterSail !== 'all' && oso.rob) ? oso.rob[sailIdx] : null;
+      const robLabel = robCode ? ({ NR: 'Not required', L: 'Low', M: 'Medium', H: 'High' }[robCode] || robCode) : null;
 
       const div = document.createElement('div');
       div.className = 'oso-item' + (dimmed ? ' na' : '');
@@ -986,7 +1024,7 @@ window.renderOSO = function() {
         <div class="oso-text" style="width:100%;">
           <div>
             <span class="oso-num">OSO #${oso.num}</span>
-            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">Min SAIL ${oso.minSail}</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">Min SAIL ${oso.minSail}${robLabel ? ' · Robustness at SAIL ' + filterSail + ': ' + robLabel : ''}</span>
             &nbsp;${oso.text}
           </div>
           <div class="oso-desc-box" style="display:none; margin-top:10px;">
@@ -2380,7 +2418,19 @@ window.dbrfLoad = function(inputEl) {
       try { data = JSON.parse(e.target.result); }
       catch (pe) { throw new Error('Plan file is not valid JSON (.dbrf).'); }
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Plan file has an unexpected structure.');
-      Object.entries(data.fields || {}).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+      // The Step #8 selectors changed in v3.3.0 to follow AMC1 Article 11, Tables 8–13.
+      // Old values are mapped where the old band lies inside a new one; anything else
+      // is cleared so that the adjacent ground area has to be assessed again.
+      const fieldMigrations = {
+        'cont-adj-pop':  { sparse: '50', suburban: '500', urban: '' },
+        'cont-assembly': { no: 'under40k', yes: '' },
+      };
+      Object.entries(data.fields || {}).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const migration = fieldMigrations[id];
+        el.value = (migration && Object.prototype.hasOwnProperty.call(migration, val)) ? migration[val] : val;
+      });
       // Migrate radio values from pre-SORA-v2.5 .dbrf files to current values.
       // Old values were based on the incorrect iGRC matrix and mitigation scheme.
       const radioMigrations = {
@@ -3213,7 +3263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) { el.addEventListener('input', window.liveWeatherAssessment); el.addEventListener('change', window.liveWeatherAssessment); }
   });
   
-  document.querySelectorAll('input[name="containment"], #cont-adj-pop, #cont-assembly')
+  document.querySelectorAll('input[name="containment"], #cont-adj-pop, #cont-assembly, #cont-shelter')
     .forEach(el => el.addEventListener('change', window.assessContainment));
 
   const opCoordsEl = document.getElementById('op-coords');

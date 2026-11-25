@@ -4,453 +4,440 @@
 // ==========================================
 // MISSIONDESK — CONTAINMENT MODULE (Step #8)
 // ==========================================
-// Adjacent area assessment and containment robustness requirements.
-// Covers SORA v2.5 Section 4.8 and Tables 8–13.
+// Adjacent ground area assessment and required containment robustness.
 //
 // Verified against:
-//   - SORA v2.5 Main Body, Section 4.8 (Containment Step #8)
-//   - SORA v2.5 Annex E §E.4, Tables 8–13
+//   - AMC1 Article 11 of Regulation (EU) 2019/947 (SORA 2.5), point S.4.8.3
+//     and Tables 8 to 13 — AMC & GM Issue 1, Amendment 5
+//     (ED Decision 2026/010/R). Amendment 5 does not change these tables;
+//     they were introduced by ED Decision 2025/018/R.
+//   - JARUS SORA v2.5 Main Body (JAR-doc-25), Section 4.8.3, Tables 8–13
+//     (used for the column layout of the tables).
 //
-// NOTE: Table cell values (robustness levels) should be verified against
-// the official SORA v2.5 document. The framework and logic are correct;
-// individual cell values are based on the published specification.
+// How the tables work [S.4.8.3(c)–(d)]:
+//   Each column is a pair of OPERATIONAL LIMITS the operator commits to:
+//     - the maximum AVERAGE population density of the adjacent ground area,
+//     - the maximum size of OUTDOOR ASSEMBLIES within 1 km of the
+//       operational volume.
+//   The required containment robustness is read at the intersection of that
+//   column and the SAIL. The most stringent of the two limits governs.
+//   A HIGHER SAIL gives a LOWER containment requirement, because the UAS is
+//   already less likely to leave the operational volume.
 //
-// All references cited inline. Public API exposed on window.*.
+// All references are cited inline. Public API is exposed on window.*.
 // ---------------------------------------------------------------------------
 
 (function () {
   'use strict';
 
   // ---------------------------------------------------------------------------
-  // SECTION 1 — ADJACENT AREA CALCULATION
-  // Source: SORA v2.5 §4.8.3(b)(i)
+  // SECTION 1 — ADJACENT GROUND AREA SIZE
+  // Source: AMC1 Article 11, S.4.8.3(b)(i)
   //
-  // Adjacent area = distance travelled in 3 minutes at operational speed,
-  // clamped to a minimum of 5 km and a maximum of 35 km.
+  // Distance flown in 3 minutes at MAXIMUM speed, measured outwards from the
+  // operational volume: less than 5 km → use 5 km; more than 35 km → use 35 km.
   // ---------------------------------------------------------------------------
 
   /**
-   * Calculate the adjacent area radius in km.
-   * @param {number} speedMs - UA operational speed in m/s
-   * @returns {number} Adjacent area in km, clamped to [5, 35]
+   * Calculate the lateral outer limit of the adjacent ground area.
+   * @param {number} speedMs - Maximum UA speed in m/s
+   * @returns {number} Distance in km, clamped to [5, 35]
    */
   function calcAdjacentAreaKm(speedMs) {
-    const raw = (speedMs * 180) / 1000; // 3 min = 180 s → km
+    const raw = ((Number(speedMs) || 0) * 180) / 1000; // 3 min = 180 s
     return Math.max(5, Math.min(35, raw));
   }
 
   // ---------------------------------------------------------------------------
-  // SECTION 2 — SIZE CLASS SELECTION
-  // Source: SORA v2.5 Tables 8–13 (size class breakpoints)
+  // SECTION 2 — TABLE SELECTION
+  // Source: AMC1 Article 11, Tables 8–13 (table headings)
   //
-  // Returns size class 0–4 for in-scope UAs; null for >40 m (outside SORA scope).
-  // Uses the same characteristic dimension thresholds as the iGRC column selection.
+  // The table is chosen from the maximum characteristic dimension AND the
+  // maximum speed, using the same classes as the iGRC table (Step #2).
   // ---------------------------------------------------------------------------
 
+  const SIZE_CLASSES = [
+    { sizeClass: 0, dimLimit:  1, speedLimit:  25, label: '1 m UA (< 25 m/s)'   },
+    { sizeClass: 1, dimLimit:  3, speedLimit:  35, label: '3 m UA (< 35 m/s)'   },
+    { sizeClass: 2, dimLimit:  8, speedLimit:  75, label: '8 m UA (< 75 m/s)'   },
+    { sizeClass: 3, dimLimit: 20, speedLimit: 120, label: '20 m UA (< 120 m/s)' },
+    { sizeClass: 4, dimLimit: 40, speedLimit: 200, label: '40 m UA (< 200 m/s)' },
+  ];
+
   /**
-   * Determine containment size class from UA characteristic dimension.
-   * @param {number} dimMeters - Characteristic dimension in metres
-   * @returns {number|null} Size class 0–4, or null if outside SORA scope
+   * Determine the containment size class (0–4) from dimension and speed.
+   * @param {number} dimMeters - Maximum characteristic dimension in metres
+   * @param {number} [speedMs] - Maximum speed in m/s (omit to classify on dimension only)
+   * @returns {number|null} Size class, or null when outside Tables 8–13
    */
-  function getContainmentSizeClass(dimMeters) {
-    if (dimMeters <= 1)  return 0; // Table 8: ≤1 m
-    if (dimMeters <= 3)  return 1; // Table 9: >1 m, ≤3 m
-    if (dimMeters <= 8)  return 2; // Tables 10/11: >3 m, ≤8 m (shelter-dependent)
-    if (dimMeters <= 20) return 3; // Table 12: >8 m, ≤20 m
-    if (dimMeters <= 40) return 4; // Table 13: >20 m, ≤40 m
-    return null;                   // >40 m — outside SORA v2.5 scope
+  function getContainmentSizeClass(dimMeters, speedMs) {
+    const speed = (speedMs === undefined || speedMs === null) ? 0 : speedMs;
+    for (const c of SIZE_CLASSES) {
+      if (dimMeters <= c.dimLimit && speed <= c.speedLimit) return c.sizeClass;
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
   // SECTION 3 — CONTAINMENT TABLES 8–13
-  // Source: SORA v2.5 Annex E §E.4, Tables 8–13
+  // Source: AMC1 Article 11, S.4.8.3, Tables 8–13
   //
-  // Each table covers one size class and defines the required containment
-  // robustness for each combination of SAIL level and adjacent area environment.
+  // columns[]: ordered left → right exactly as printed.
+  //   popLimit      — average population density allowed in the adjacent
+  //                   ground area, people/km² (Infinity = no upper limit)
+  //   assemblyRank  — largest outdoor assembly allowed within 1 km:
+  //                   2 = more than 400 000, 1 = 40 000 to 400 000,
+  //                   0 = fewer than 40 000
   //
-  // Column encoding:
-  //   popThresholds = [25, 500] → 3 population columns:
-  //     col 0: controlled / remote  (<25 ppl/km²)
-  //     col 1: sparse / rural       (25–500 ppl/km²)
-  //     col 2: populated / suburban (≥500 ppl/km²)
-  //   assemblyColIdx = 3: assembly/gathering of people (≥100 persons within range)
-  //
-  //   finalColIdx = max(popColIdx, assemblyColIdx)
-  //
-  // Robustness level encoding: 0=none, 1=low, 2=medium, 3=high
-  //
-  // sailRows[sailIdx][colIdx]:
-  //   sailIdx 0 = SAIL I, 1 = SAIL II, ..., 5 = SAIL VI
+  // rows[sail]: required robustness per column.
+  //   'H' = high, 'M' = medium, 'L' = low, 'X' = out of scope
   // ---------------------------------------------------------------------------
 
-  const ROBUSTNESS = { 0: 'none', 1: 'low', 2: 'medium', 3: 'high' };
+  const INF = Infinity;
 
-  // Population density thresholds (ppl/km²) — right-open intervals.
-  // [25, 500] → 3 pop cols: col 0 (<25), col 1 (25–<500), col 2 (≥500).
-  const POP_THRESHOLDS = [25, 500];
-
-  // Assembly of people forces column index 3 (the most demanding column)
-  // when ≥100 people are present in a gathering within the adjacent area.
-  const ASSEMBLY_COL      = 3;
-  const ASSEMBLY_MIN_SIZE = 100; // ≥100 people = "assembly of people" per SORA v2.5 §2.2
-
-  // ---------------------------------------------------------------------------
-  // Table 8: Size class 0 — UA characteristic dimension ≤1 m
-  // Source: SORA v2.5 Annex E §E.4, Table 8
-  // ---------------------------------------------------------------------------
   const TABLE_8 = {
-    tableRef: 'Table 8 (size ≤1 m)',
-    shelteringApplicable: false,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    // sailRows[SAIL_idx][col]: 0=none, 1=low, 2=medium, 3=high
-    //                             col0   col1   col2   col3(assembly)
-    sailRows: [
-      /* SAIL I   */ [0,     0,     1,     1],
-      /* SAIL II  */ [0,     1,     1,     2],
-      /* SAIL III */ [1,     1,     2,     2],
-      /* SAIL IV  */ [1,     2,     2,     3],
-      /* SAIL V   */ [2,     2,     3,     3],
-      /* SAIL VI  */ [2,     3,     3,     3],
+    tableRef: 'Table 8 — UA up to 1 m (< 25 m/s), shelter assumed applicable',
+    columns: [
+      { popLimit: INF,   assemblyRank: 2 },
+      { popLimit: INF,   assemblyRank: 1 },
+      { popLimit: 50000, assemblyRank: 0 },
     ],
+    rows: {
+      1: ['H', 'M', 'L'],
+      2: ['H', 'M', 'L'],
+      3: ['M', 'L', 'L'],
+      4: ['L', 'L', 'L'],
+      5: ['L', 'L', 'L'],
+      6: ['L', 'L', 'L'],
+    },
   };
 
-  // ---------------------------------------------------------------------------
-  // Table 9: Size class 1 — UA characteristic dimension >1 m, ≤3 m
-  // Source: SORA v2.5 Annex E §E.4, Table 9
-  // ---------------------------------------------------------------------------
   const TABLE_9 = {
-    tableRef: 'Table 9 (size >1 m ≤3 m)',
-    shelteringApplicable: false,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    sailRows: [
-      /* SAIL I   */ [0,     1,     1,     2],
-      /* SAIL II  */ [1,     1,     2,     2],
-      /* SAIL III */ [1,     2,     2,     3],
-      /* SAIL IV  */ [2,     2,     3,     3],
-      /* SAIL V   */ [2,     3,     3,     3],
-      /* SAIL VI  */ [3,     3,     3,     3],
+    tableRef: 'Table 9 — UA up to 3 m (< 35 m/s), shelter applicable in the adjacent ground area',
+    columns: [
+      { popLimit: INF,   assemblyRank: 2 },
+      { popLimit: INF,   assemblyRank: 1 },
+      { popLimit: 50000, assemblyRank: 0 },
+      { popLimit: 5000,  assemblyRank: 0 },
     ],
+    rows: {
+      1: ['X', 'H', 'M', 'L'],
+      2: ['X', 'H', 'M', 'L'],
+      3: ['X', 'M', 'L', 'L'],
+      4: ['M', 'L', 'L', 'L'],
+      5: ['L', 'L', 'L', 'L'],
+      6: ['L', 'L', 'L', 'L'],
+    },
   };
 
-  // ---------------------------------------------------------------------------
-  // Table 10: Size class 2 — UA >3 m, ≤8 m — WITHOUT sheltering credit
-  // Source: SORA v2.5 Annex E §E.4, Table 10
-  // Used when sheltering is not applicable (open terrain, no buildings).
-  // ---------------------------------------------------------------------------
   const TABLE_10 = {
-    tableRef: 'Table 10 (size >3 m ≤8 m, no sheltering)',
-    shelteringApplicable: false,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    sailRows: [
-      /* SAIL I   */ [1,     1,     2,     2],
-      /* SAIL II  */ [1,     2,     2,     3],
-      /* SAIL III */ [2,     2,     3,     3],
-      /* SAIL IV  */ [2,     3,     3,     3],
-      /* SAIL V   */ [3,     3,     3,     3],
-      /* SAIL VI  */ [3,     3,     3,     3],
+    tableRef: 'Table 10 — UA up to 3 m (< 35 m/s), shelter not applicable in the adjacent ground area',
+    columns: [
+      { popLimit: INF,   assemblyRank: 2 },
+      { popLimit: 50000, assemblyRank: 1 },
+      { popLimit: 5000,  assemblyRank: 0 },
+      { popLimit: 500,   assemblyRank: 0 },
     ],
+    rows: {
+      1: ['X', 'H', 'M', 'L'],
+      2: ['X', 'H', 'M', 'L'],
+      3: ['X', 'M', 'L', 'L'],
+      4: ['M', 'L', 'L', 'L'],
+      5: ['L', 'L', 'L', 'L'],
+      6: ['L', 'L', 'L', 'L'],
+    },
   };
 
-  // ---------------------------------------------------------------------------
-  // Table 11: Size class 2 — UA >3 m, ≤8 m — WITH sheltering credit
-  // Source: SORA v2.5 Annex E §E.4, Table 11
-  // Used when sheltering applies (built-up area, structures provide cover).
-  // Requirements are one robustness level lower than Table 10 where applicable.
-  // ---------------------------------------------------------------------------
+  // Tables 11–13 share one column layout.
+  const LARGE_UA_COLUMNS = [
+    { popLimit: INF,   assemblyRank: 2 },
+    { popLimit: 50000, assemblyRank: 1 },
+    { popLimit: 5000,  assemblyRank: 0 },
+    { popLimit: 500,   assemblyRank: 0 },
+    { popLimit: 50,    assemblyRank: 0 },
+  ];
+
   const TABLE_11 = {
-    tableRef: 'Table 11 (size >3 m ≤8 m, sheltering credit applied)',
-    shelteringApplicable: true,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    sailRows: [
-      /* SAIL I   */ [0,     1,     1,     2],
-      /* SAIL II  */ [1,     1,     2,     2],
-      /* SAIL III */ [1,     2,     2,     3],
-      /* SAIL IV  */ [2,     2,     3,     3],
-      /* SAIL V   */ [2,     3,     3,     3],
-      /* SAIL VI  */ [3,     3,     3,     3],
-    ],
+    tableRef: 'Table 11 — UA up to 8 m (< 75 m/s)',
+    columns: LARGE_UA_COLUMNS,
+    rows: {
+      1: ['X', 'X', 'H', 'M', 'L'],
+      2: ['X', 'X', 'H', 'M', 'L'],
+      3: ['X', 'X', 'M', 'L', 'L'],
+      4: ['X', 'M', 'L', 'L', 'L'],
+      5: ['M', 'L', 'L', 'L', 'L'],
+      6: ['L', 'L', 'L', 'L', 'L'],
+    },
   };
 
-  // ---------------------------------------------------------------------------
-  // Table 12: Size class 3 — UA >8 m, ≤20 m
-  // Source: SORA v2.5 Annex E §E.4, Table 12
-  // ---------------------------------------------------------------------------
   const TABLE_12 = {
-    tableRef: 'Table 12 (size >8 m ≤20 m)',
-    shelteringApplicable: false,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    sailRows: [
-      /* SAIL I   */ [1,     2,     2,     3],
-      /* SAIL II  */ [2,     2,     3,     3],
-      /* SAIL III */ [2,     3,     3,     3],
-      /* SAIL IV  */ [3,     3,     3,     3],
-      /* SAIL V   */ [3,     3,     3,     3],
-      /* SAIL VI  */ [3,     3,     3,     3],
-    ],
+    tableRef: 'Table 12 — UA up to 20 m (< 120 m/s)',
+    columns: LARGE_UA_COLUMNS,
+    rows: {
+      1: ['X', 'X', 'X', 'H', 'M'],
+      2: ['X', 'X', 'X', 'H', 'M'],
+      3: ['X', 'X', 'X', 'M', 'L'],
+      4: ['X', 'X', 'M', 'L', 'L'],
+      5: ['X', 'M', 'L', 'L', 'L'],
+      6: ['M', 'L', 'L', 'L', 'L'],
+    },
   };
 
-  // ---------------------------------------------------------------------------
-  // Table 13: Size class 4 — UA >20 m, ≤40 m
-  // Source: SORA v2.5 Annex E §E.4, Table 13
-  // ---------------------------------------------------------------------------
   const TABLE_13 = {
-    tableRef: 'Table 13 (size >20 m ≤40 m)',
-    shelteringApplicable: false,
-    popThresholds: POP_THRESHOLDS,
-    assemblyThresholds: [ASSEMBLY_MIN_SIZE],
-    sailRows: [
-      /* SAIL I   */ [2,     3,     3,     3],
-      /* SAIL II  */ [3,     3,     3,     3],
-      /* SAIL III */ [3,     3,     3,     3],
-      /* SAIL IV  */ [3,     3,     3,     3],
-      /* SAIL V   */ [3,     3,     3,     3],
-      /* SAIL VI  */ [3,     3,     3,     3],
-    ],
+    tableRef: 'Table 13 — UA up to 40 m (< 200 m/s)',
+    columns: LARGE_UA_COLUMNS,
+    rows: {
+      1: ['X', 'X', 'X', 'X', 'H'],
+      2: ['X', 'X', 'X', 'X', 'H'],
+      3: ['X', 'X', 'X', 'X', 'M'],
+      4: ['X', 'X', 'X', 'M', 'L'],
+      5: ['X', 'X', 'M', 'L', 'L'],
+      6: ['X', 'M', 'L', 'L', 'L'],
+    },
   };
 
+  const ROBUSTNESS       = { L: 'low', M: 'medium', H: 'high' };
+  const ROBUSTNESS_INDEX = { L: 1, M: 2, H: 3 };
+
   // ---------------------------------------------------------------------------
-  // SECTION 4 — LOOKUP FUNCTION
-  // Selects the most restrictive column from population density and assembly,
-  // then returns the required robustness for the given SAIL level.
+  // SECTION 4 — INPUT NORMALISATION
+  // ---------------------------------------------------------------------------
+
+  // Upper bounds of the population bands printed in the table headers.
+  const POP_BANDS = [50, 500, 5000, 50000];
+
+  /**
+   * Convert an average population density into the band it falls in.
+   * Accepts a number (people/km²) or one of '50' | '500' | '5000' | '50000' |
+   * 'nolimit' (the values used by the Step #8 selector in the app).
+   * @returns {number|null} Exclusive upper bound of the band (Infinity above
+   *                        50 000), or null when no value was given.
+   */
+  function normalisePopBand(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (value === 'nolimit') return INF;
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return null;
+    // A selector value IS the band's upper bound; a measured density is
+    // placed in the first band whose upper bound it stays below.
+    if (typeof value === 'string' && POP_BANDS.includes(n)) return n;
+    for (const bound of POP_BANDS) {
+      if (n < bound) return bound;
+    }
+    return INF;
+  }
+
+  /**
+   * Convert an outdoor-assembly size into a rank 0–2.
+   * Accepts a head count or 'under40k' | '40k_400k' | 'over400k'.
+   * @returns {number|null}
+   */
+  function normaliseAssemblyRank(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (value === 'under40k') return 0;
+    if (value === '40k_400k') return 1;
+    if (value === 'over400k') return 2;
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return null;
+    if (n < 40000)   return 0;
+    if (n <= 400000) return 1;
+    return 2;
+  }
+
+  function describeColumn(col) {
+    const pop = col.popLimit === INF
+      ? 'no upper limit on the average population density of the adjacent ground area'
+      : `average population density of the adjacent ground area below ${col.popLimit.toLocaleString('en-GB')} people/km²`;
+    const assembly = [
+      'no outdoor assembly of more than 40,000 people within 1 km of the operational volume',
+      'no outdoor assembly of more than 400,000 people within 1 km of the operational volume',
+      'no limit on outdoor assemblies within 1 km of the operational volume',
+    ][col.assemblyRank];
+    return [pop, assembly];
+  }
+
+  // ---------------------------------------------------------------------------
+  // SECTION 5 — TABLE LOOKUP
+  // Source: AMC1 Article 11, S.4.8.3(d) — "considering the most stringent
+  // between the value of the average population density and the outdoor
+  // assembly of people".
+  //
+  // The right-most column whose two limits both cover the actual adjacent
+  // area is the least demanding column the operator may claim.
   // ---------------------------------------------------------------------------
 
   /**
-   * Look up required containment robustness from a containment table.
-   * @param {object} table    - One of TABLE_8 through TABLE_13
-   * @param {number} sail     - SAIL level (1–6)
-   * @param {number} adjPopDensity   - Adjacent area population density (ppl/km²)
-   * @param {number} assemblySize    - Number of people in largest assembly (0 = none)
-   * @returns {{ robustnessIndex, robustness, popColIdx, assemblyColIdx, finalColIdx, assemblyApplied }}
+   * Look up the required containment robustness.
+   * @param {object} table         - One of TABLE_8 … TABLE_13
+   * @param {number} sail          - SAIL 1–6
+   * @param {number} popBand       - From normalisePopBand()
+   * @param {number} assemblyRank  - From normaliseAssemblyRank()
+   * @returns {{ code, robustness, robustnessIndex, outOfScope, columnIndex, column, limitedBy }}
    */
-  function lookupContainment(table, sail, adjPopDensity, assemblySize) {
-    const sailIdx = Math.max(0, Math.min(5, sail - 1)); // SAIL I=1 → index 0
+  function lookupContainment(table, sail, popBand, assemblyRank) {
+    const row = table.rows[sail];
+    if (!row) throw new Error('Invalid SAIL for containment lookup: ' + sail);
 
-    // Determine population column index based on density thresholds.
-    let popColIdx = table.popThresholds.length; // default = last pop col
-    for (let i = 0; i < table.popThresholds.length; i++) {
-      if (adjPopDensity < table.popThresholds[i]) { popColIdx = i; break; }
+    let columnIndex = 0;
+    for (let i = table.columns.length - 1; i >= 0; i--) {
+      const col = table.columns[i];
+      if (popBand <= col.popLimit && assemblyRank <= col.assemblyRank) { columnIndex = i; break; }
     }
 
-    // Assembly forces column index to ASSEMBLY_COL (3) when size threshold is met.
-    const assemblyColIdx = (assemblySize >= (table.assemblyThresholds[0] || ASSEMBLY_MIN_SIZE))
-      ? ASSEMBLY_COL
-      : 0;
+    // Which of the two inputs stopped us from moving further right?
+    let limitedBy = null;
+    const next = table.columns[columnIndex + 1];
+    if (next) {
+      const popBlocks      = popBand > next.popLimit;
+      const assemblyBlocks = assemblyRank > next.assemblyRank;
+      limitedBy = popBlocks && assemblyBlocks ? 'both' : popBlocks ? 'population' : 'assembly';
+    }
 
-    // Most restrictive (highest) column wins.
-    const finalColIdx = Math.max(popColIdx, assemblyColIdx);
-
-    const robustnessIndex = (table.sailRows[sailIdx] && table.sailRows[sailIdx][finalColIdx] != null)
-      ? table.sailRows[sailIdx][finalColIdx]
-      : 0;
-
+    const code = row[columnIndex];
     return {
-      robustnessIndex,
-      robustness: ROBUSTNESS[robustnessIndex] || 'none',
-      popColIdx,
-      assemblyColIdx,
-      finalColIdx,
-      assemblyApplied: assemblyColIdx > popColIdx,
+      code,
+      robustness:      code === 'X' ? null : ROBUSTNESS[code],
+      robustnessIndex: code === 'X' ? null : ROBUSTNESS_INDEX[code],
+      outOfScope:      code === 'X',
+      columnIndex,
+      column: table.columns[columnIndex],
+      limitedBy,
     };
   }
 
   // ---------------------------------------------------------------------------
-  // SECTION 5 — FULL STEP #8 PIPELINE
-  // Orchestrates adjacent area calculation, size class selection, table lookup,
-  // and result packaging.
-  //
-  // Parameters:
-  //   dimMeters           {number}  UA characteristic dimension in metres
-  //   speedMs             {number}  UA operational speed in m/s
-  //   massGrams           {number|null}  UA mass in grams (null = unknown)
-  //   sail                {number}  SAIL level from Steps 3–7 (1–6, or 0 = not yet determined)
-  //   adjPopDensity       {number}  Adjacent area population density (ppl/km²)
-  //   assemblySize        {number}  Number of people in largest nearby assembly (0 = none)
-  //   shelteringApplicable {boolean} Whether sheltering credit applies (for class 2, >3–≤8 m)
-  //   groundRiskBufferKm  {number}  GRB from volume calculation (km)
-  //
-  // Returns an object with:
-  //   adjacentAreaKm      {number}   Calculated adjacent area radius (km)
-  //   sizeClass           {number|null} UA size class (0–4) or null if OOS
-  //   tableRef            {string|null} Human-readable table reference
-  //   requiredRobustness  {string|null} 'none'/'low'/'medium'/'high' or null
-  //   robustnessIndex     {number|null} 0–3 or null
-  //   skipGRB             {boolean}  True for ≤250 g special case
-  //   oos                 {boolean}  True if outside SORA scope
-  //   oosReason           {string|null} Reason if OOS
-  //   popColIdx           {number|null} Population column used
-  //   assemblyApplied     {boolean}  True if assembly drove the requirement
-  //   shelterDecision     {string|null} Shelter credit note
-  //   operationalLimits   {string|null} Guidance text for required robustness
-  //   note                {string|null} Additional contextual note
+  // SECTION 6 — FULL STEP #8 PIPELINE
   // ---------------------------------------------------------------------------
+
+  const GUIDANCE = {
+    low:    'Low robustness — see Annex E, Section 4 of AMC1 Article 11 for the containment requirements.',
+    medium: 'Medium robustness — see Annex E, Section 4 of AMC1 Article 11 for the containment requirements.',
+    high:   'High robustness — see Annex E, Section 4 of AMC1 Article 11 for the containment requirements.',
+  };
+
+  function baseResult(adjacentAreaKm) {
+    return {
+      adjacentAreaKm,
+      sizeClass:          null,
+      tableRef:           null,
+      robustness:         null,   // 'low' | 'medium' | 'high' | null
+      robustnessIndex:    null,   // 1–3 | null
+      outOfScope:         false,
+      outOfScopeGuidance: null,
+      incomplete:         false,  // true when an input is still missing
+      under250g:          false,
+      columnIndex:        null,
+      limitedBy:          null,
+      shelterDecision:    null,
+      operationalLimits:  [],     // limits the operator must document and respect
+      guidance:           null,
+      note:               null,
+    };
+  }
 
   /**
    * Full SORA Step #8 containment pipeline.
-   * @param {object} params - See parameter list above
-   * @returns {object} Containment result
+   *
+   * @param {object}  params
+   * @param {number}  params.dimMeters             - Maximum characteristic dimension (m)
+   * @param {number}  params.speedMs               - Maximum speed (m/s)
+   * @param {number}  [params.massGrams]           - Take-off mass in grams (null = unknown)
+   * @param {number}  params.sail                  - SAIL 1–6 from Step #7
+   * @param {number|string} params.adjPopDensity   - Average population density of the adjacent
+   *                                                 ground area, or a selector band value
+   * @param {number|string} params.assemblySize    - Largest outdoor assembly within 1 km of the
+   *                                                 operational volume, or a selector value
+   * @param {boolean} [params.shelteringApplicable] - Sheltering applicable in the adjacent
+   *                                                 ground area (3 m UA only; Table 9 vs 10)
+   * @returns {object} See baseResult()
    */
   function computeContainment(params) {
     const {
-      dimMeters           = 0,
-      speedMs             = 15,
-      massGrams           = null,
-      sail                = 0,
-      adjPopDensity       = 0,
-      assemblySize        = 0,
+      dimMeters            = 0,
+      speedMs              = 0,
+      massGrams            = null,
+      sail                 = 0,
+      adjPopDensity        = null,
+      assemblySize         = null,
       shelteringApplicable = false,
-      groundRiskBufferKm  = 0,
-    } = params;
+    } = params || {};
 
-    const adjacentAreaKm = calcAdjacentAreaKm(speedMs);
+    const result = baseResult(calcAdjacentAreaKm(speedMs));
 
     // -------------------------------------------------------------------------
-    // 250 g special case — SORA v2.5 §4.1
-    // UAs ≤250 g and ≤25 m/s are exempt from containment requirements.
-    // GRB step is also skipped for this category.
+    // Take-off mass below 250 g — AMC1 Article 11, S.4.8.3(a):
+    // "apply low containment with no required operational limitations for the
+    //  population in the adjacent ground area and go to Step #9".
     // -------------------------------------------------------------------------
-    const is250g = massGrams !== null
-      ? (massGrams <= 250 && speedMs <= 25)
-      : (dimMeters <= 0.25 && speedMs <= 25); // Estimate based on dimension if mass unknown
-
-    if (is250g) {
-      return {
-        adjacentAreaKm,
-        sizeClass: 0,
-        tableRef: 'N/A — ≤250 g special case (SORA v2.5 §4.1)',
-        requiredRobustness: 'none',
-        robustnessIndex: 0,
-        skipGRB: true,
-        oos: false,
-        oosReason: null,
-        popColIdx: 0,
-        assemblyApplied: false,
-        shelterDecision: null,
-        operationalLimits: 'No containment requirement — ≤250 g, ≤25 m/s UA is exempt per SORA v2.5 §4.1',
-        note: '≤250 g special case: GRB step and containment requirements do not apply.',
-      };
+    if (massGrams !== null && massGrams !== undefined && massGrams < 250) {
+      result.under250g       = true;
+      result.robustness      = 'low';
+      result.robustnessIndex = 1;
+      result.tableRef        = 'S.4.8.3(a) — take-off mass below 250 g';
+      result.guidance        = GUIDANCE.low;
+      result.note            = 'Take-off mass below 250 g: low containment applies, with no operational limitations for the population in the adjacent ground area. [AMC1 Article 11, S.4.8.3(a)]';
+      return result;
     }
 
-    const sizeClass = getContainmentSizeClass(dimMeters);
+    const sizeClass = getContainmentSizeClass(dimMeters, speedMs);
+    result.sizeClass = sizeClass;
 
-    // -------------------------------------------------------------------------
-    // Out-of-scope check — dimension >40 m requires certification category
-    // -------------------------------------------------------------------------
     if (sizeClass === null) {
-      return {
-        adjacentAreaKm,
-        sizeClass: null,
-        tableRef: null,
-        requiredRobustness: null,
-        robustnessIndex: null,
-        skipGRB: false,
-        oos: true,
-        oosReason: `UA characteristic dimension ${dimMeters.toFixed(1)} m exceeds SORA v2.5 scope (max 40 m) — certification category required.`,
-        popColIdx: null,
-        assemblyApplied: false,
-        shelterDecision: null,
-        operationalLimits: null,
-        note: null,
-      };
+      result.outOfScope = true;
+      result.outOfScopeGuidance =
+        `UA with characteristic dimension ${dimMeters} m and maximum speed ${speedMs} m/s is not covered by ` +
+        'Tables 8 to 13 (maximum 40 m and 200 m/s). [AMC1 Article 11, S.4.8.3]';
+      return result;
     }
 
-    // -------------------------------------------------------------------------
-    // SAIL not yet determined — Steps 3–7 must be completed first
-    // -------------------------------------------------------------------------
     if (!sail || sail < 1 || sail > 6) {
-      return {
-        adjacentAreaKm,
-        sizeClass,
-        tableRef: null,
-        requiredRobustness: null,
-        robustnessIndex: null,
-        skipGRB: false,
-        oos: false,
-        oosReason: null,
-        popColIdx: null,
-        assemblyApplied: false,
-        shelterDecision: null,
-        operationalLimits: null,
-        note: 'SAIL not yet determined — complete SORA Steps 3–7 first, then return to Step 8.',
-      };
+      result.incomplete = true;
+      result.note = 'SAIL not yet determined — complete Steps #2 to #7 first.';
+      return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Table selection
-    // Size class 2 (>3 m–≤8 m) has two tables: Table 10 (no shelter) and
-    // Table 11 (with sheltering credit). All other classes have one table each.
-    // -------------------------------------------------------------------------
+    const popBand      = normalisePopBand(adjPopDensity);
+    const assemblyRank = normaliseAssemblyRank(assemblySize);
+    if (popBand === null || assemblyRank === null) {
+      result.incomplete = true;
+      result.note = 'Select the average population density of the adjacent ground area and the size of outdoor assemblies within 1 km.';
+      return result;
+    }
+
+    // Table selection. Only the 3 m class distinguishes shelter / no shelter.
     let table;
-    let shelterDecision = null;
-
-    if (sizeClass === 2) {
-      if (shelteringApplicable) {
-        table = TABLE_11;
-        shelterDecision = 'Sheltering credit applied — using Table 11 (reduced requirements)';
-      } else {
-        table = TABLE_10;
-        shelterDecision = 'No sheltering credit — using Table 10 (conservative)';
-      }
+    if (sizeClass === 1) {
+      table = shelteringApplicable ? TABLE_9 : TABLE_10;
+      result.shelterDecision = shelteringApplicable
+        ? 'Sheltering applicable in the adjacent ground area — Table 9 used.'
+        : 'Sheltering not applicable in the adjacent ground area — Table 10 used.';
     } else {
-      const tableMap = [TABLE_8, TABLE_9, null, TABLE_12, TABLE_13];
-      table = tableMap[sizeClass];
+      table = [TABLE_8, null, TABLE_11, TABLE_12, TABLE_13][sizeClass];
+    }
+    result.tableRef = table.tableRef;
+
+    const lookup = lookupContainment(table, sail, popBand, assemblyRank);
+    result.columnIndex = lookup.columnIndex;
+    result.limitedBy   = lookup.limitedBy;
+
+    if (lookup.outOfScope) {
+      result.outOfScope = true;
+      result.outOfScopeGuidance =
+        'Out of scope: with this adjacent ground area the operation cannot be conducted in the ‘specific’ category. ' +
+        'Consider another location or a higher SAIL. [AMC1 Article 11, S.4.8.3, ' + table.tableRef.split(' — ')[0] + ']';
+      return result;
     }
 
-    if (!table) {
-      return {
-        adjacentAreaKm, sizeClass, tableRef: null,
-        requiredRobustness: null, robustnessIndex: null,
-        skipGRB: false, oos: true,
-        oosReason: 'Internal error: no table for size class ' + sizeClass,
-        popColIdx: null, assemblyApplied: false, shelterDecision: null,
-        operationalLimits: null, note: null,
-      };
+    result.robustness        = lookup.robustness;
+    result.robustnessIndex   = lookup.robustnessIndex;
+    result.operationalLimits = describeColumn(lookup.column);
+    result.guidance          = GUIDANCE[lookup.robustness];
+    if (lookup.limitedBy === 'assembly') {
+      result.note = 'The size of outdoor assemblies within 1 km is the governing limit.';
+    } else if (lookup.limitedBy === 'population') {
+      result.note = 'The average population density of the adjacent ground area is the governing limit.';
     }
-
-    const lookup = lookupContainment(table, sail, adjPopDensity, assemblySize);
-
-    // -------------------------------------------------------------------------
-    // Operational limits guidance text (informational)
-    // -------------------------------------------------------------------------
-    let operationalLimits;
-    switch (lookup.robustnessIndex) {
-      case 3:
-        operationalLimits = 'High robustness required — certified containment measures or Design Verification Report (DVR) from EASA required.';
-        break;
-      case 2:
-        operationalLimits = 'Medium robustness required — independent verification of containment measures (e.g., by a qualified entity) required.';
-        break;
-      case 1:
-        operationalLimits = 'Low robustness — operator declaration sufficient; document containment measures in ConOps/OpManual.';
-        break;
-      default:
-        operationalLimits = 'No specific containment requirement applies to this scenario.';
-    }
-
-    // Note if assembly drove the requirement beyond population density
-    const note = lookup.assemblyApplied
-      ? 'Assembly/gathering of people within the adjacent area is the driving containment factor.'
-      : null;
-
-    return {
-      adjacentAreaKm,
-      sizeClass,
-      tableRef: table.tableRef,
-      requiredRobustness: lookup.robustness,
-      robustnessIndex: lookup.robustnessIndex,
-      skipGRB: false,
-      oos: false,
-      oosReason: null,
-      popColIdx: lookup.popColIdx,
-      assemblyApplied: lookup.assemblyApplied,
-      shelterDecision,
-      operationalLimits,
-      note,
-    };
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -458,6 +445,8 @@
   // ---------------------------------------------------------------------------
   window.calcAdjacentAreaKm      = calcAdjacentAreaKm;
   window.getContainmentSizeClass = getContainmentSizeClass;
+  window.normalisePopBand        = normalisePopBand;
+  window.normaliseAssemblyRank   = normaliseAssemblyRank;
   window.lookupContainment       = lookupContainment;
   window.computeContainment      = computeContainment;
   window.CONTAINMENT_TABLES      = { TABLE_8, TABLE_9, TABLE_10, TABLE_11, TABLE_12, TABLE_13 };

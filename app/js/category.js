@@ -5,7 +5,8 @@
 // MISSIONDESK — OPERATION CATEGORY MODULE
 // ==========================================
 // Determines the applicable EU UAS operational category (Open / Specific /
-// Certified) and checks Standard Scenario (STS-01/STS-02) eligibility.
+// Certified), checks Standard Scenario (STS-01/STS-02) eligibility and checks
+// the predefined risk assessments (PDRA-S01, PDRA-G01, PDRA-G02).
 //
 // Verified against:
 //   - EU 2019/947 (UAS Operations Regulation), Articles 3–6
@@ -13,6 +14,9 @@
 //   - EU 2019/947 Annex, Appendix 1 — UAS.STS-01 and UAS.STS-02
 //   - EU 2019/945 (UAS Design), Article 40 (Certified category triggers)
 //   - Easy Access Rules (EASA), GM1 Article 3 (category boundaries)
+//   - AMC2, AMC3 and AMC4 to Article 11 of EU 2019/947 — PDRA-G01, PDRA-G02
+//     and PDRA-S01, October 2026 editions — and GM1 to AMC1 Article 11,
+//     Table 2 — AMC & GM Issue 1, Amendment 5 (ED Decision 2026/010/R)
 //
 // Public API exposed on window.*.
 // ---------------------------------------------------------------------------
@@ -282,12 +286,238 @@
   }
 
   // ---------------------------------------------------------------------------
+  // SECTION 3b — PREDEFINED RISK ASSESSMENTS (PDRA), OCTOBER 2026 EDITIONS
+  // Source: AMC & GM to EU 2019/947, Issue 1, Amendment 5 (ED Decision
+  //         2026/010/R): GM1 to AMC1 Article 11 (Table 2), AMC2 Article 11
+  //         (PDRA-G01), AMC3 Article 11 (PDRA-G02), AMC4 Article 11 (PDRA-S01).
+  //
+  // Amendment 5 rebuilt the PDRAs on SORA 2.5:
+  //   - PDRA-S01, PDRA-G01 and PDRA-G02 have new October 2026 editions.
+  //     The UA limit is now 3 m and a maximum speed of 35 m/s; the former
+  //     34 kJ kinetic-energy limit (and, for S01, the 25 kg limit) is gone.
+  //   - PDRA-S02 and PDRA-G03 are DELETED from Table 2. The previous AMC4 and
+  //     AMC5 (Amendment 2) cease to be acceptable means of compliance from
+  //     1 January 2027 [ED Decision 2026/010/R, Article 2(3)].
+  //
+  // A PDRA is an AMC: the limits below are the scope of the predefined
+  // assessment. An operation outside them needs a full SORA
+  // [AMC1 Article 11, point (d)].
+  //
+  // All three PDRAs share: SAIL II, low containment, adjacent ground area of
+  // 6.3 km, one remote pilot per UA, no dangerous goods, UA not tethered, and
+  // no outdoor assembly of more than 40 000 people within 1 km of the
+  // operational volume.
+  // ---------------------------------------------------------------------------
+
+  const PDRA_EDITION = 'October 2026';
+
+  const PDRA_DEFINITIONS = {
+    'PDRA-S01': {
+      amc:         'AMC4 Article 11',
+      edition:     PDRA_EDITION,
+      summary:     'VLOS over a controlled ground area (same type of operation as STS-01, without the C5 class mark).',
+      flight:      'VLOS',
+      igrc:        1,
+      finalGRC:    1,
+      residualARC: 'b',
+      sail:        2,
+      containment: 'low',
+      pilot:       'STS theoretical certificate and STS-01 practical accreditation',
+    },
+    'PDRA-G01': {
+      amc:         'AMC2 Article 11',
+      edition:     PDRA_EDITION,
+      summary:     'BVLOS within the detection line of sight (DLOS) of the remote pilot or an airspace observer, in uncontrolled airspace.',
+      flight:      'BVLOS within DLOS',
+      igrc:        3,   // 4 is accepted when M1(A) sheltering (low) brings the final GRC to 3
+      finalGRC:    3,
+      residualARC: 'b',
+      sail:        2,
+      containment: 'low',
+      pilot:       'STS theoretical certificate and STS-02 practical accreditation',
+    },
+    'PDRA-G02': {
+      amc:         'AMC3 Article 11',
+      edition:     PDRA_EDITION,
+      summary:     'BVLOS in an atypical air environment (airspace reserved or segregated for the UAS operation, or close to obstacles).',
+      flight:      'BVLOS',
+      igrc:        3,   // 4 is accepted when M1(A) sheltering (low) brings the final GRC to 3
+      finalGRC:    3,
+      residualARC: 'a',
+      sail:        2,
+      containment: 'low',
+      pilot:       'STS theoretical certificate and STS-02 practical accreditation',
+    },
+  };
+
+  // PDRAs removed from GM1 to AMC1 Article 11, Table 2 by Amendment 5.
+  const PDRA_WITHDRAWN = {
+    'PDRA-S02': 'Deleted by Amendment 5 (ED Decision 2026/010/R). The former AMC5 Article 11 ceases to be an acceptable means of compliance from 1 January 2027.',
+    'PDRA-G03': 'Deleted from Table 2 of GM1 to AMC1 Article 11 by Amendment 5 (ED Decision 2026/010/R).',
+  };
+
+  /**
+   * Check an operation against the scope of PDRA-S01, PDRA-G01 and PDRA-G02
+   * (October 2026 editions).
+   *
+   * Only limits that can be evaluated from the inputs are checked. Items the
+   * application cannot know (remote pilot competency, operations manual) are
+   * returned in `toVerify`.
+   *
+   * @param {object}  p
+   * @param {number}  p.dimMeters                 - Maximum characteristic dimension (m)
+   * @param {number}  p.speedMs                   - Maximum speed (m/s)
+   * @param {number}  [p.mtomGrams]               - MTOM in grams
+   * @param {boolean} p.isVLOS
+   * @param {boolean} [p.withinDLOS]              - BVLOS within DLOS of the remote pilot or an AO
+   * @param {boolean} [p.controlledGround]        - Operation over a controlled ground area
+   * @param {number}  [p.popDensity]              - Max population density in operational volume + ground risk buffer
+   * @param {boolean} [p.shelteringApplicable]    - M1(A) low: vast majority of people sheltered
+   * @param {number}  [p.adjPopDensity]           - Average population density of the adjacent ground area
+   * @param {boolean} [p.adjShelteringApplicable] - Sheltering applicable in the adjacent ground area (defaults to shelteringApplicable)
+   * @param {boolean} [p.largeAssemblyWithin1km]  - Outdoor assembly of more than 40 000 people within 1 km
+   * @param {boolean} [p.controlled]              - Controlled airspace
+   * @param {boolean} [p.atypical]                - Atypical air environment (reserved/segregated, or close to obstacles)
+   * @param {boolean} [p.lowMannedAircraftRisk]   - Low encounter rate with manned aircraft
+   * @param {number}  [p.maxHeightM]              - Maximum height of the contingency volume (m AGL)
+   * @param {boolean} [p.dangerousGoods]
+   * @returns {object} { 'PDRA-S01': { eligible, failures, toVerify, definition }, ... }
+   */
+  function checkPDRAEligibility(p) {
+    const {
+      dimMeters, speedMs, mtomGrams = null, isVLOS,
+      withinDLOS = false, controlledGround = false,
+      popDensity = null, shelteringApplicable = false,
+      adjPopDensity = null, largeAssemblyWithin1km = false,
+      controlled = false, atypical = false, lowMannedAircraftRisk = true,
+      maxHeightM = null, dangerousGoods = false,
+    } = p;
+    const adjSheltering = p.adjShelteringApplicable === undefined ? shelteringApplicable : p.adjShelteringApplicable;
+
+    const out = {};
+    for (const id of Object.keys(PDRA_DEFINITIONS)) {
+      out[id] = { eligible: false, failures: [], toVerify: [], definition: PDRA_DEFINITIONS[id] };
+    }
+    const all = (msg) => Object.values(out).forEach(r => r.failures.push(msg));
+
+    // ── Common limits ──────────────────────────────────────────────────────────
+    if (dimMeters > 3) {
+      all(`UA characteristic dimension ${dimMeters} m > 3 m. [AMC2/AMC3/AMC4 Article 11, point (a)(1)]`);
+    }
+    if (speedMs > 35) {
+      all(`Maximum speed ${speedMs} m/s > 35 m/s. [AMC2/AMC3/AMC4 Article 11, point (a)(1)]`);
+    }
+    if (dangerousGoods) {
+      all('Transport of dangerous goods is not covered by the PDRAs. [PDRA application form, box 2.5]');
+    }
+    if (largeAssemblyWithin1km) {
+      all('An outdoor assembly of more than 40 000 people within 1 km of the operational volume is not allowed. [AMC2/AMC3 Article 11, point (a)(5)(iii) and (a)(6)(iii); AMC4 Article 11, point (a)(3)]');
+    }
+
+    // ── PDRA-S01 (AMC4 Article 11) ──────────────────────────────────────────────
+    const s01 = out['PDRA-S01'];
+    if (!isVLOS) {
+      s01.failures.push('PDRA-S01 requires VLOS of the remote pilot. [AMC4 Article 11, point (a)(2)]');
+    }
+    if (!controlledGround) {
+      s01.failures.push('PDRA-S01 requires a controlled ground area. [AMC4 Article 11, point (a)(3)]');
+    }
+    if (adjPopDensity !== null && adjPopDensity >= 500) {
+      s01.failures.push(`Adjacent area average population density ${adjPopDensity} people/km² is not below 500. [AMC4 Article 11, point (a)(3)]`);
+    }
+    if (!atypical) {
+      if (!lowMannedAircraftRisk) {
+        s01.failures.push('Airspace must have a low encounter rate with manned aircraft. [AMC4 Article 11, point (a)(6)]');
+      }
+      if (maxHeightM !== null && maxHeightM > 150) {
+        s01.failures.push(`Contingency volume height ${maxHeightM} m > 150 m AGL. [AMC4 Article 11, point (a)(6)]`);
+      }
+    }
+    if (maxHeightM !== null && maxHeightM > 120 && maxHeightM <= 150) {
+      s01.toVerify.push('Unless additional justification is provided, the flight geography should be set at no more than 120 m AGL. [AMC4 Article 11, footnote to point (a)(6)]');
+    }
+    if (adjPopDensity === null) {
+      s01.toVerify.push('Adjacent area average population density must be below 500 people/km². [AMC4 Article 11, point (a)(3)]');
+    }
+    s01.toVerify.push('Remote pilot holds an STS theoretical certificate and an STS-01 practical accreditation. [AMC4 Article 11, point (a)(5)]');
+
+    // ── Ground limits shared by PDRA-G01 and PDRA-G02 ────────────────────────────
+    // MTOM ≤ 25 kg AND vast majority of people sheltered:
+    //   < 50 people/km² in the operational volume and ground risk buffer;
+    //   adjacent area < 5 000 people/km² (< 500 where sheltering is not
+    //   applicable in the adjacent area).
+    // Otherwise:
+    //   < 5 people/km²; adjacent area < 500 people/km².
+    // [AMC2 and AMC3 Article 11, points (a)(5) and (a)(6)]
+    const lightAndSheltered = mtomGrams !== null && mtomGrams <= 25000 && shelteringApplicable;
+    const popLimit = lightAndSheltered ? 50 : 5;
+    const adjLimit = (lightAndSheltered && adjSheltering) ? 5000 : 500;
+    const groundFailures = [];
+    const groundToVerify = [];
+    const basis = lightAndSheltered
+      ? 'MTOM ≤ 25 kg with sheltering (M1(A) low)'
+      : 'MTOM > 25 kg or sheltering not applicable';
+    if (popDensity !== null) {
+      if (popDensity >= popLimit) {
+        groundFailures.push(`Population density ${popDensity} people/km² in the operational volume and ground risk buffer is not below ${popLimit} (${basis}). [point (a)(5)(i) / (a)(6)(i)]`);
+      }
+    } else {
+      groundToVerify.push(`Maximum population density in the operational volume and ground risk buffer must be below ${popLimit} people/km² (${basis}). [point (a)(5)(i) / (a)(6)(i)]`);
+    }
+    if (adjPopDensity !== null) {
+      if (adjPopDensity >= adjLimit) {
+        groundFailures.push(`Adjacent area average population density ${adjPopDensity} people/km² is not below ${adjLimit}. [point (a)(5)(ii) / (a)(6)(ii)]`);
+      }
+    } else {
+      groundToVerify.push(`Adjacent area average population density must be below ${adjLimit} people/km². [point (a)(5)(ii) / (a)(6)(ii)]`);
+    }
+    if (mtomGrams === null) {
+      groundToVerify.push('MTOM unknown — the stricter limits (5 and 500 people/km²) were applied.');
+    }
+
+    // ── PDRA-G01 (AMC2 Article 11) ──────────────────────────────────────────────
+    const g01 = out['PDRA-G01'];
+    if (isVLOS) {
+      g01.failures.push('PDRA-G01 covers BVLOS within the detection line of sight (DLOS) of the remote pilot or an airspace observer. [AMC2 Article 11, point (a)(2)]');
+    } else if (!withinDLOS) {
+      g01.failures.push('BVLOS operation must stay within the detection line of sight (DLOS) of the remote pilot or an airspace observer. [AMC2 Article 11, point (a)(2)]');
+    }
+    if (controlled) {
+      g01.failures.push('PDRA-G01 is limited to uncontrolled airspace. [AMC2 Article 11, point (a)(7)]');
+    }
+    if (!lowMannedAircraftRisk) {
+      g01.failures.push('Airspace must have a low encounter rate with manned aircraft. [AMC2 Article 11, point (a)(7)]');
+    }
+    if (maxHeightM !== null && maxHeightM > 150) {
+      g01.failures.push(`Contingency volume height ${maxHeightM} m > 150 m AGL. [AMC2 Article 11, point (a)(7)]`);
+    }
+    g01.failures.push(...groundFailures.map(m => m.replace('[point', '[AMC2 Article 11, point')));
+    g01.toVerify.push(...groundToVerify.map(m => m.replace('[point', '[AMC2 Article 11, point')));
+    g01.toVerify.push('Remote pilot holds an STS theoretical certificate and an STS-02 practical accreditation. [AMC2 Article 11, point (a)(4)]');
+
+    // ── PDRA-G02 (AMC3 Article 11) ──────────────────────────────────────────────
+    const g02 = out['PDRA-G02'];
+    if (isVLOS) {
+      g02.failures.push('PDRA-G02 covers BVLOS operations. [AMC3 Article 11, point (a)(2)]');
+    }
+    if (!atypical) {
+      g02.failures.push('PDRA-G02 requires an atypical air environment: airspace reserved or segregated for the UAS operation, or close to an obstacle. [AMC3 Article 11, point (a)(2)]');
+    }
+    g02.failures.push(...groundFailures.map(m => m.replace('[point', '[AMC3 Article 11, point')));
+    g02.toVerify.push(...groundToVerify.map(m => m.replace('[point', '[AMC3 Article 11, point')));
+    g02.toVerify.push('Remote pilot holds an STS theoretical certificate and an STS-02 practical accreditation. [AMC3 Article 11, point (a)(4)]');
+
+    for (const r of Object.values(out)) r.eligible = r.failures.length === 0;
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
   // SECTION 4 — MAIN ENTRY POINT: classifyOperation()
   // ---------------------------------------------------------------------------
   // Evaluation order:
   //   1. Certified hard triggers (C1–C3)
   //   2. Open category criteria (general + A1/A2/A3 subcategory)
-  //   3. If neither → Specific; check STS-01/STS-02 eligibility
+  //   3. If neither → Specific; check STS-01/STS-02 eligibility and the PDRAs
   // ---------------------------------------------------------------------------
 
   /**
@@ -343,8 +573,10 @@
       };
     }
 
-    // Step 3 — Specific category + STS check
-    const stsResult = checkSTSEligibility(params);
+    // Step 3 — Specific category + STS check + PDRA check
+    const stsResult  = checkSTSEligibility(params);
+    const pdraResult = checkPDRAEligibility(params);
+    const pdraEligible = Object.keys(pdraResult).filter(id => pdraResult[id].eligible);
     let nextStep;
     if (stsResult.sts01Eligible) {
       nextStep =
@@ -356,9 +588,17 @@
         'Operation qualifies for STS-02 declaration. No full SORA authorisation required — ' +
         'submit declaration to competent authority of Member State of registration. ' +
         '[EU 2019/947, Art. 5(5); Annex Appendix 1, UAS.STS-02]';
+    } else if (pdraEligible.length > 0) {
+      nextStep =
+        `Operation is Specific category — within the scope of ${pdraEligible.join(' / ')} ` +
+        `(${PDRA_EDITION} edition), subject to the items listed under "to verify". An operational ` +
+        'authorisation is still required, but the application may be based on the PDRA application ' +
+        'form and compliance matrix instead of a full SORA safety case. ' +
+        '[EU 2019/947, Art. 12; AMC1 Article 11 and AMC2–AMC4 Article 11, Amendment 5]';
     } else {
       nextStep =
-        'Operation is Specific category — does not qualify for STS-01 or STS-02. ' +
+        'Operation is Specific category — does not qualify for STS-01 or STS-02 and is outside ' +
+        'the scope of PDRA-S01, PDRA-G01 and PDRA-G02. ' +
         'A full SORA risk assessment and operational authorisation from the competent ' +
         'authority are required. [EU 2019/947, Art. 5(1)–(4) and Art. 11]';
     }
@@ -370,6 +610,8 @@
       sts02Eligible:     stsResult.sts02Eligible,
       sts01Failures:     stsResult.sts01Failures,
       sts02Failures:     stsResult.sts02Failures,
+      pdra:              pdraResult,
+      pdraEligible,
       certifiedTriggers: [],
       openFailures:      openResult.failedCriteria,
       warnings:          openResult.warnings,
@@ -384,6 +626,9 @@
   window.checkCertifiedTriggers = checkCertifiedTriggers;
   window.checkOpenCriteria      = checkOpenCriteria;
   window.checkSTSEligibility    = checkSTSEligibility;
+  window.checkPDRAEligibility   = checkPDRAEligibility;
+  window.PDRA_DEFINITIONS       = PDRA_DEFINITIONS;
+  window.PDRA_WITHDRAWN         = PDRA_WITHDRAWN;
   window.classifyOperation      = classifyOperation;
 
 })();

@@ -121,7 +121,7 @@
 
       <div class="info-box">
         In SORA 2.5, the concept of <strong>ConOps</strong> has been replaced by <strong>Detailed Operational Information (DOI)</strong>.
-        DOI is the structured information baseline that underpins all subsequent risk assessment steps (Annex A, ED Decision 2025/018/R).
+        DOI is the structured information baseline that underpins all subsequent risk assessment steps (Annex A to AMC1 Article 11 of Regulation (EU) 2019/947).
         Fill in the essential information below. <strong>Expand <em>Full ConOps</em> if you wish to add a complete operational description.</strong>
       </div>
 
@@ -386,9 +386,25 @@
             <label for="cat-sts2">STS-02<br><small>BVLOS low exposure</small></label>
           </div>
           <div class="radio-option">
+            <input type="radio" name="cat" id="cat-pdra-s01" value="PDRA-S01">
+            <label for="cat-pdra-s01">PDRA-S01<br><small>VLOS controlled ground</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-pdra-g01" value="PDRA-G01">
+            <label for="cat-pdra-g01">PDRA-G01<br><small>BVLOS within DLOS</small></label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" name="cat" id="cat-pdra-g02" value="PDRA-G02">
+            <label for="cat-pdra-g02">PDRA-G02<br><small>BVLOS atypical airspace</small></label>
+          </div>
+          <div class="radio-option">
             <input type="radio" name="cat" id="cat-specific" value="SPECIFIC">
             <label for="cat-specific">Specific / SORA<br><small>Full risk assessment</small></label>
           </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6;">
+          PDRA-S01, PDRA-G01 and PDRA-G02 are the October 2026 editions (AMC2–AMC4 to Article 11, AMC &amp; GM Issue 1 Amendment 5, ED Decision 2026/010/R):
+          UA up to 3 m and 35 m/s, SAIL II, low containment. PDRA-S02 and PDRA-G03 have been withdrawn. SORA 2.0 ceases to be an acceptable means of compliance on 1 January 2027.
         </div>
       </div>
       <div class="form-grid three">
@@ -746,7 +762,7 @@
 
     <div class="panel" id="panel-1">
       <div class="panel-title">Steps 2–7 – iGRC · GRC · ARC · SAIL</div>
-      <div class="panel-sub">// SORA 2.5 QUANTITATIVE RISK ASSESSMENT · JARUS JAR-doc-25 TABLE 2</div>
+      <div class="panel-sub">// SORA 2.5 QUANTITATIVE RISK ASSESSMENT · AMC1 ARTICLE 11 (EU 2019/947) · JARUS JAR-doc-25</div>
 
       <div class="section-label">▸ STEP 2 – INTRINSIC GROUND RISK CLASS (iGRC)</div>
       <div class="info-box">
@@ -784,11 +800,11 @@
           </div>
           <div class="radio-option">
             <input type="radio" name="pop" id="pop-suburban" value="suburban">
-            <label for="pop-suburban">Suburban<br><small>&lt;500 ppl/km²</small></label>
+            <label for="pop-suburban">Sparsely populated<br><small>&lt;500 ppl/km²</small></label>
           </div>
           <div class="radio-option">
             <input type="radio" name="pop" id="pop-low-metro" value="low_metro">
-            <label for="pop-low-metro">Low density metro<br><small>&lt;5,000 ppl/km²</small></label>
+            <label for="pop-low-metro">Suburban / low-density metro<br><small>&lt;5,000 ppl/km²</small></label>
           </div>
           <div class="radio-option">
             <input type="radio" name="pop" id="pop-high-metro" value="high_metro">
@@ -984,48 +1000,68 @@
 
     <div class="panel" id="panel-2">
       <div class="panel-title">Step 8 – Containment</div>
-      <div class="panel-sub">// NEW DEDICATED STEP IN SORA 2.5 · ANNEX E §E.4</div>
+      <div class="panel-sub">// SORA 2.5 STEP #8 · AMC1 ARTICLE 11, S.4.8 · TABLES 8–13 · ANNEX E SECTION 4</div>
 
       <div class="info-box">
         Containment ensures that the <strong>Target Level of Safety is achieved in the adjacent area</strong>.
         In SORA 2.5, containment is a dedicated step (#8) before OSO. Three robustness levels: <strong>Low / Medium / High</strong>.
-        Requirements depend on UA size, SAIL, population density in adjacent area, and presence of crowds within 1 km.
+        The required level is read from Tables 8–13 of AMC1 Article 11: it depends on the UA size class, the SAIL, and the
+        <strong>operational limits you commit to</strong> for the adjacent ground area — its average population density and the size of
+        outdoor assemblies within 1 km of the operational volume. A higher SAIL gives a lower containment requirement.
+        UA with a take-off mass below 250 g: low containment, no operational limits.
       </div>
 
       <div class="section-label">▸ ADJACENT AREA</div>
       <div class="form-grid">
         <div class="field">
-          <label>Population density in adjacent area</label>
+          <label>Average population density of the adjacent ground area</label>
           <select id="cont-adj-pop">
-            <option value="sparse">Sparse / rural (&lt;25 pers/km²)</option>
-            <option value="suburban">Suburban (25–500 pers/km²)</option>
-            <option value="urban">Urban (&gt;500 pers/km²)</option>
+            <option value="">— select —</option>
+            <option value="50">Below 50 people/km²</option>
+            <option value="500">Below 500 people/km²</option>
+            <option value="5000">Below 5,000 people/km²</option>
+            <option value="50000">Below 50,000 people/km²</option>
+            <option value="nolimit">No upper limit (50,000 people/km² or more)</option>
           </select>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Average between the ground risk buffer and the outer limit of the adjacent area (S.4.8.3(b)(ii))</div>
         </div>
         <div class="field">
-          <label>Crowd within 1 km of operations volume boundary</label>
+          <label>Outdoor assemblies within 1 km of the operational volume</label>
           <select id="cont-assembly">
-            <option value="no">No</option>
-            <option value="yes">Yes – increases containment requirements</option>
+            <option value="">— select —</option>
+            <option value="under40k">None, or fewer than 40,000 people</option>
+            <option value="40k_400k">40,000 to 400,000 people</option>
+            <option value="over400k">More than 400,000 people</option>
           </select>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">During the time when the flight takes place (S.4.8.3(b)(iii))</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Sheltering applicable in the adjacent ground area</label>
+          <select id="cont-shelter">
+            <option value="no">No – Table 10</option>
+            <option value="yes">Yes – Table 9</option>
+          </select>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Only used for the 3 m / 35 m/s size class. See Annex B, Table B.2 (M1(A)) for when sheltering applies.</div>
         </div>
       </div>
 
       <div class="section-label">▸ CONTAINMENT MEASURES</div>
       <div class="field" style="margin-bottom:16px;">
-        <label>Selected containment robustness level (SORA 2.5 Annex E §E.4)</label>
+        <label>Selected containment robustness level (AMC1 Article 11, Annex E Section 4)</label>
         <div class="radio-group">
           <div class="radio-option">
             <input type="radio" name="containment" id="cont-low" value="low">
-            <label for="cont-low">Low robustness<br><small>Procedure-based measures, operator declaration</small></label>
+            <label for="cont-low">Low robustness<br><small>No probable single failure leads outside the operational volume; ground risk buffer at least 1:1</small></label>
           </div>
           <div class="radio-option">
             <input type="radio" name="containment" id="cont-med" value="medium">
-            <label for="cont-med">Medium robustness<br><small>Technical and procedure-based measures, independent verification</small></label>
+            <label for="cont-med">Medium robustness<br><small>As low; ground risk buffer also covers probable failures, wind, latencies and containment behaviour</small></label>
           </div>
           <div class="radio-option">
             <input type="radio" name="containment" id="cont-high" value="high">
-            <label for="cont-high">High robustness<br><small>Certified technical measures, DVR from EASA</small></label>
+            <label for="cont-high">High robustness<br><small>No remote single failure leads outside the operational volume (below 10⁻⁴ per flight hour)</small></label>
           </div>
         </div>
       </div>
@@ -1698,7 +1734,7 @@
       <div class="section-label" style="margin-top:32px;">▸ ABOUT MISSIONDESK</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.8;">
         <div><span style="color:var(--muted);">APPLICATION</span> &nbsp; MissionDesk – EASA SORA UAS Operations Briefing System</div>
-        <div><span style="color:var(--muted);">REGULATION</span> &nbsp; EASA SORA v2.5 · EU 2019/947 · EU 2019/945 · ED Decision 2025/018/R</div>
+        <div><span style="color:var(--muted);">REGULATION</span> &nbsp; EASA SORA v2.5 · EU 2019/947 · EU 2019/945 · AMC &amp; GM Issue 1, Amendment 5 (ED Decision 2026/010/R)</div>
         <div><span style="color:var(--muted);">FRAMEWORK</span> &nbsp; Tauri v1.6.3 · Vite · Vanilla JS ES Modules</div>
         <div><span style="color:var(--muted);">DATA SOURCES</span> &nbsp; CheckWX (METAR/TAF) · OpenAIP (Airspace) · SMHI (Observations)</div>
         <div style="margin-top:8px;">
@@ -1714,6 +1750,7 @@
 <script src="js/version.js"></script>
 <script src="js/igrc.js"></script>
 <script src="js/arc.js"></script>
+<script src="js/containment.js"></script>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script src="js/maps.js"></script>

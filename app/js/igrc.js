@@ -7,6 +7,10 @@
 // Intrinsic Ground Risk Class (iGRC) and Final GRC calculation.
 //
 // Verified against:
+//   - AMC1 Article 11 of Regulation (EU) 2019/947 (SORA 2.5), S.4.2.3 Table 1
+//     (iGRC), Table 2 (qualitative descriptors) and S.4.3.3 Table 5
+//     (mitigations) — AMC & GM Issue 1, Amendment 5 (ED Decision 2026/010/R).
+//     Amendment 5 leaves these tables unchanged.
 //   - SORA v2.5 Main Body, Table 2 (iGRC matrix) and Table 5 (mitigations)
 //   - SORA v2.5 Annex F, Table 2 (iGRC), Table 8 (qualitative descriptors),
 //     Table 12 (mitigation reductions), Equation 5 (analytical iGRC formula)
@@ -27,8 +31,8 @@
   //   0 = Controlled ground area
   //   1 = < 5     ppl/km²  (Remote)
   //   2 = < 50    ppl/km²  (Lightly populated)
-  //   3 = < 500   ppl/km²  (Suburban / Residential lightly populated)
-  //   4 = < 5,000 ppl/km²  (Low density metropolitan)
+  //   3 = < 500   ppl/km²  (Sparsely populated / Residential lightly populated)
+  //   4 = < 5,000 ppl/km²  (Suburban / Low-density metropolitan)
   //   5 = < 50,000 ppl/km² (High density metropolitan)
   //   6 = ≥ 50,000 ppl/km² (Assemblies of people)
   //
@@ -44,14 +48,15 @@
   //   [SORA v2.5 Main Body, Section 4.2.3(c)]
   //
   // Special rule: UA ≤ 250 g AND ≤ 25 m/s → iGRC = 1 regardless of population
-  //   [SORA v2.5 Main Body, Table 2 footnote]
+  //   density, UNLESS operating over assemblies of people.
+  //   [AMC1 Article 11, S.4.2.3, Table 1, first note]
   const IGRC_MATRIX = [
     //  ≤1m    ≤3m    ≤8m    ≤20m   ≤40m
     [    1,     1,     2,     3,     3  ],  // Controlled
     [    2,     3,     4,     5,     6  ],  // < 5      (Remote)
     [    3,     4,     5,     6,     7  ],  // < 50     (Lightly populated)
-    [    4,     5,     6,     7,     8  ],  // < 500    (Suburban)
-    [    5,     6,     7,     8,     9  ],  // < 5,000  (Low density metro)
+    [    4,     5,     6,     7,     8  ],  // < 500    (Sparsely populated)
+    [    5,     6,     7,     8,     9  ],  // < 5,000  (Suburban / low-density metro)
     [    6,     7,     8,     9,    10  ],  // < 50,000 (High density metro)
     [    7,     8,  null,  null,  null  ],  // ≥ 50,000 (Assemblies of people)
   ];
@@ -96,8 +101,11 @@
     'controlled':  0,
     'remote':      1,  // < 5 ppl/km²
     'lightly':     2,  // < 50 ppl/km²
-    'suburban':    3,  // < 500 ppl/km²
-    'low_metro':   4,  // < 5,000 ppl/km²
+    // The keys 'suburban' and 'low_metro' are kept for compatibility with saved
+    // plan files. In AMC1 Article 11, Table 2 the < 500 band is called
+    // 'Sparsely populated' and the < 5 000 band 'Suburban / Low-density metropolitan'.
+    'suburban':    3,  // < 500 ppl/km²   (Sparsely populated)
+    'low_metro':   4,  // < 5,000 ppl/km² (Suburban / Low-density metropolitan)
     'high_metro':  5,  // < 50,000 ppl/km²
     'assemblies':  6,  // ≥ 50,000 ppl/km²
   };
@@ -107,8 +115,8 @@
     'Controlled',
     'Remote (<5 ppl/km²)',
     'Lightly populated (<50 ppl/km²)',
-    'Suburban (<500 ppl/km²)',
-    'Low density metro (<5,000 ppl/km²)',
+    'Sparsely populated (<500 ppl/km²)',
+    'Suburban / low-density metro (<5,000 ppl/km²)',
     'High density metro (<50,000 ppl/km²)',
     'Assemblies of people (≥50,000 ppl/km²)',
   ];
@@ -163,8 +171,8 @@
   function getPopRow(popDensity) {
     if (popDensity < 5)      return 1; // Remote
     if (popDensity < 50)     return 2; // Lightly populated
-    if (popDensity < 500)    return 3; // Suburban
-    if (popDensity < 5000)   return 4; // Low density metropolitan
+    if (popDensity < 500)    return 3; // Sparsely populated
+    if (popDensity < 5000)   return 4; // Suburban / low-density metropolitan
     if (popDensity < 50000)  return 5; // High density metropolitan
     return 6;                           // Assemblies of people (≥50,000)
   }
@@ -319,8 +327,11 @@
       mitigations = {},
     } = params;
 
-    // 250 g special case — iGRC = 1 regardless of population
-    if (massGrams !== null && is250gSpecialCase(massGrams, speedMs)) {
+    // 250 g special case — iGRC = 1 regardless of population density, unless
+    // operating over assemblies of people. [AMC1 Article 11, S.4.2.3, Table 1]
+    const overAssemblies = popQual === 'assemblies' ||
+      (popQual !== 'controlled' && popDensity !== null && popDensity >= 50000);
+    if (massGrams !== null && is250gSpecialCase(massGrams, speedMs) && !overAssemblies) {
       return {
         igrc: 1,
         finalGRC: 1,
@@ -328,7 +339,7 @@
         specialCase: '250g_rule',
         dimCol: 0,
         popRow: null,
-        note: 'UA ≤250 g and ≤25 m/s: iGRC = 1 regardless of population density [SORA v2.5, Table 2 footnote]',
+        note: 'UA ≤250 g and ≤25 m/s: iGRC = 1 regardless of population density, except over assemblies of people [AMC1 Article 11, S.4.2.3, Table 1]',
         m1Reduction: 0, m2Reduction: 0, totalReduction: 0,
         columnFloor: 1, m1FloorApplied: false,
         details: [],

@@ -23,6 +23,8 @@
 //   array explaining why.
 //
 // Verified against:
+//   - AMC1 Article 11 of Regulation (EU) 2019/947 (SORA 2.5), S.4.1–S.4.10 —
+//     AMC & GM Issue 1, Amendment 5 (ED Decision 2026/010/R)
 //   - SORA v2.5 Main Body, Sections 4.1–4.10 (process flow)
 //   - EU 2019/947, Articles 3–6 (category definitions)
 //
@@ -227,9 +229,9 @@
         massGrams:            p.massGrams,
         shelteringApplicable: p.shelteringApplicable,
         sail:                 airResult.sail,
-        adjPopDensity:        p.adjPopDensity  ?? 0,
-        assemblySize:         p.assemblySize   ?? 0,
-        groundRiskBufferKm:   p.groundRiskBufferKm,
+        // No default: an unknown adjacent ground area must not be treated as empty.
+        adjPopDensity:        p.adjPopDensity  ?? null,
+        assemblySize:         p.assemblySize   ?? null,
       });
     } catch (err) {
       blockers.push(makeBlocker('containment', err.message));
@@ -239,9 +241,10 @@
       });
     }
 
-    if (containmentResult.outOfScope) {
+    if (containmentResult.outOfScope || containmentResult.incomplete) {
       blockers.push(makeBlocker('containment',
         containmentResult.outOfScopeGuidance ||
+        containmentResult.note ||
         'Containment assessment is out of scope for this operation.'
       ));
       return _buildResult({
@@ -267,6 +270,11 @@
     // ═══════════════════════════════════════════════════════════════════════
     // SUCCESS — all steps complete
     // ═══════════════════════════════════════════════════════════════════════
+    const summary = _soraSummary({ groundResult, airResult, containmentResult, osoResult });
+    // PDRA-S01 / G01 / G02 (October 2026 editions) — see category.js, Section 3b.
+    summary.pdraEligible = categoryResult.pdraEligible || [];
+    if (summary.pdraEligible.length > 0) summary.nextStep = categoryResult.nextStep;
+
     return _buildResult({
       input: p,
       completed: true,
@@ -277,7 +285,7 @@
       airResult,
       containmentResult,
       osoResult,
-      summary: _soraSummary({ groundResult, airResult, containmentResult, osoResult }),
+      summary,
     });
   };
 
@@ -358,11 +366,11 @@
         `Residual ARC-${airResult.residualARC.toUpperCase()} | ` +
         `Containment: ${containmentResult.robustness} | ` +
         `${osoResult.requiredCount} OSOs required`,
-      regulation: 'SORA v2.5 (JARUS); EU 2019/947, Article 11',
+      regulation: 'SORA 2.5 — AMC1 to Article 11 of Regulation (EU) 2019/947 (AMC & GM Issue 1, Amendment 5)',
       nextStep:
         'Compile Comprehensive Safety Portfolio (CSP) for Steps #2–9 and submit ' +
         'to the competent authority for operational authorisation. ' +
-        '[SORA v2.5 Main Body, Section 4.10]',
+        '[AMC1 Article 11, S.4.10]',
       keyOutputs: {
         igrc:                groundResult.igrc,
         finalGRC:            groundResult.finalGRC,

@@ -7,18 +7,28 @@
 // SORA v2.5 Step #9: Identification of Operational Safety Objectives (OSOs).
 //
 // Verified against:
-//   - SORA v2.5 Main Body, Section 4.9, Table 14 (pp. 54–55)  ← PRIMARY SOURCE
-//   - Easy Access Rules (EU 2019/947), Section 2.5.2, Table 6 (pp. 62–63)
+//   - AMC1 Article 11 of Regulation (EU) 2019/947 (SORA 2.5), point S.4.9.3,
+//     Table 14 — AMC & GM Issue 1, Amendment 5 (ED Decision 2026/010/R)
+//                                                          ← PRIMARY SOURCE
+//   - JARUS SORA v2.5 Main Body, Section 4.9, Table 14 (pp. 54–55)
 //
-// ─── IMPORTANT: TWO VERSIONS OF THE OSO TABLE EXIST ────────────────────────
+// EASA's Table 14 and the JARUS Table 14 differ for ONE objective: OSO #04 is
+// NR NR NR M H H in the EASA AMC and NR NR NR L M H in the JARUS Main Body
+// (SAIL IV and V). MissionDesk targets operations under Regulation (EU)
+// 2019/947, so the EASA values are used.
 //
-// SORA v2.5 Main Body (JARUS, Table 14) contains 17 OSOs:
+// ─── THE 24-OSO TABLE IS SORA 2.0 AND HAS BEEN WITHDRAWN ───────────────────
+//
+// SORA 2.5 (AMC1 Article 11, Table 14) contains 17 OSOs:
 //   #01–09, #13, #16–20, #23–24
 //
-// Easy Access Rules (EASA, Table 6) contains 24 OSOs:
-//   #01–24  (adds #10, #11, #12, #14, #15, #21, #22)
+// The 24-OSO table (#01–24) is Table 6 of AMC1bis Article 11, i.e. SORA 2.0.
+// Amendment 5 (ED Decision 2026/010/R) deletes AMC1bis Article 11; it ceases
+// to be an acceptable means of compliance from 1 January 2027. The seven
+// extra OSOs are kept below only so that assessments made under SORA 2.0 can
+// still be read. They must not be used for new assessments.
 //
-// The 7 additional OSOs in EAR Table 6 that are NOT in Main Body Table 14:
+// The 7 additional OSOs in SORA 2.0 Table 6 that are NOT in SORA 2.5 Table 14:
 //   OSO#10 – Safe recovery from a technical issue
 //   OSO#11 – Procedures for deterioration of external systems
 //   OSO#12 – UAS designed to manage deterioration of external systems
@@ -27,8 +37,8 @@
 //   OSO#21 – Operational procedures (adverse conditions group)
 //   OSO#22 – Remote crew trained to identify critical environmental conditions
 //
-// `getOSOsForSAIL()` uses Main Body Table 14 by default.
-// Pass `{ useEAR: true }` to use the fuller EAR Table 6 instead.
+// `getOSOsForSAIL()` uses SORA 2.5 Table 14 by default.
+// Pass `{ useEAR: true }` to get the withdrawn SORA 2.0 list instead (legacy).
 //
 // Robustness codes:
 //   'NR' = Not Required (but applicant encouraged to consider at low integrity)
@@ -43,8 +53,8 @@
   'use strict';
 
   // ---------------------------------------------------------------------------
-  // SECTION 1 — OSO DEFINITIONS: SORA v2.5 MAIN BODY TABLE 14
-  // Source: SORA v2.5 Main Body, Table 14 (pp. 54–55)
+  // SECTION 1 — OSO DEFINITIONS: SORA 2.5 TABLE 14
+  // Source: AMC1 Article 11, S.4.9.3, Table 14 (EASA)
   //
   // sail: [SAIL_I, SAIL_II, SAIL_III, SAIL_IV, SAIL_V, SAIL_VI]  (index 0–5)
   // ---------------------------------------------------------------------------
@@ -84,11 +94,12 @@
       id:          4,
       title:       'UAS components essential to safe operations are designed to an Airworthiness Design Standard (ADS)',
       group:       'Technical issue with the UAS',
-      sail:        ['NR', 'NR', 'NR', 'L',  'M',  'H'],
+      // EASA Table 14: NR NR NR M H H (JARUS Main Body Table 14 has L M H).
+      sail:        ['NR', 'NR', 'NR', 'M',  'H',  'H'],
       responsible: ['designer'],
       annex_e_ref: [],
       source:      'both',
-      note:        'Competent authority may accept that recognised standards are not met for experimental flights investigating new technical solutions.',
+      note:        'SAIL IV and V follow EASA Table 14 (Medium / High). The JARUS SORA 2.5 Main Body lists Low / Medium for the same SAILs.',
     },
     {
       id:          5,
@@ -220,13 +231,12 @@
   ];
 
   // ---------------------------------------------------------------------------
-  // SECTION 2 — ADDITIONAL OSOs IN EAR TABLE 6 (NOT IN MAIN BODY TABLE 14)
-  // Source: Easy Access Rules (EU 2019/947), Table 6 (pp. 62–63)
+  // SECTION 2 — LEGACY: ADDITIONAL OSOs OF SORA 2.0 (AMC1bis ARTICLE 11, TABLE 6)
+  // Source: AMC1bis Article 11, Table 6 — WITHDRAWN by Amendment 5
+  // (ED Decision 2026/010/R); not an AMC from 1 January 2027.
   //
-  // These 7 OSOs exist in EAR Table 6 but are absent from Main Body Table 14.
-  // Their absence from the Main Body is deliberate — JARUS chose a more compact
-  // set. Included here so MissionDesk can present the fuller EAR view if the
-  // competent authority requests it.
+  // These 7 OSOs exist in SORA 2.0 but are not listed in SORA 2.5 Table 14.
+  // Kept for reading old SORA 2.0 assessments only.
   // ---------------------------------------------------------------------------
 
   const OSO_DEFINITIONS_EAR_ONLY = [
@@ -393,8 +403,11 @@
       nrCount:       byRobustness['NR'],
       byRobustness,
       tableSource:   useEAR
-        ? 'Easy Access Rules (EU 2019/947), Table 6 — 24 OSOs'
-        : 'SORA v2.5 Main Body, Table 14 — 17 OSOs',
+        ? 'SORA 2.0 — AMC1bis Article 11, Table 6 — 24 OSOs (withdrawn by Amendment 5)'
+        : 'SORA 2.5 — AMC1 Article 11, Table 14 — 17 OSOs',
+      // SORA 2.0 was deleted by ED Decision 2026/010/R and ceases to be an
+      // acceptable means of compliance from 1 January 2027.
+      withdrawn:     useEAR,
       osos,
     };
   }
