@@ -458,6 +458,10 @@ window.generateBriefing = function() {
 
   const catEl = document.querySelector('input[name="cat"]:checked');
   const cat = catEl ? catEl.value : '–';
+  // Result of the Step #0 category check (set by updateCategoryCheck in app.js)
+  const catCheck = window.categoryCheck || null;
+  const categoryCheckText = !catCheck ? '–'
+    : window.escHtml(catCheck.headline) + (catCheck.consistent === false ? ' — differs from the selected category' : '');
   const los = v('op-los');
 
   let osoChecked = 0;
@@ -532,6 +536,7 @@ window.generateBriefing = function() {
       <div class="brief-row"><span class="brief-key">MTOM:</span><span class="brief-val">${v('drone-mtom')} kg</span></div>
       <div class="brief-row"><span class="brief-key">Remote ID:</span><span class="brief-val">${v('drone-rid')}</span></div>
       <div class="brief-row"><span class="brief-key">Operation category:</span><span class="brief-val">${cat}</span></div>
+      <div class="brief-row"><span class="brief-key">Category check:</span><span class="brief-val">${categoryCheckText}</span></div>
       <div class="brief-row"><span class="brief-key">Flight regime:</span><span class="brief-val">${los}</span></div>
       <div class="brief-row"><span class="brief-key">Operation type:</span><span class="brief-val">${v('op-type')}</span></div>
       ${window.buildEnergyBriefRow ? window.buildEnergyBriefRow() : ''}

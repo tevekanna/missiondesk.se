@@ -781,6 +781,224 @@ function _showSailCaution(message) {
   window.sailResult = { grc: 0, iGRC: 0, arc: 0, sail: 0, grcLabel: '–', arcLabel: '–' };
 }
 
+// --- SORA PIPELINE: INPUT, CATEGORY CHECK (STEP #0) AND STATUS ---
+// Collects every input the SORA orchestrator (sora.js) needs from the form.
+// One function feeds both the category check and calcSAIL25(), so the two can
+// never disagree about what the operator entered.
+window._gatherSoraInput = function() {
+  const val   = id => String(document.getElementById(id)?.value ?? '').trim();
+  const radio = name => document.querySelector(`input[name="${name}"]:checked`)?.value || null;
+
+  const guard = window._validateSoraNumeric(
+    val('igrc-dim') || val('drone-dim'), val('igrc-speed') || val('drone-speed'), val('drone-mtom'));
+  if (!guard.ok) return { ok: false, message: guard.message };
+
+  const massGrams  = guard.mass !== null ? guard.mass * 1000 : null;
+  const altRaw     = parseFloat(val('op-alt'));
+  const maxHeightM = Number.isFinite(altRaw) && altRaw >= 0 ? altRaw : null;
+
+  // Upper bounds of the bands the operator selects (people/km²).
+  const POP_BELOW = { controlled: 0, remote: 5, lightly: 50, suburban: 500, low_metro: 5000, high_metro: 50000, assemblies: Infinity };
+  const ADJ_BELOW = { '50': 50, '500': 500, '5000': 5000, '50000': 50000, nolimit: Infinity };
+
+  const pop       = radio('pop');
+  const los       = val('op-los') || 'VLOS';
+  const classRaw  = val('drone-class') || 'other';
+  const goods     = val('cat-dangerous-goods') || 'no';
+  const people    = val('cat-people') || 'uninvolved';
+  const observers = val('cat-observers') === 'yes';
+  const m1a       = radio('m1a') || 'none';
+  const adjBand   = val('cont-adj-pop');
+  const asmBand   = val('cont-assembly');
+
+  const densityVal = val('arc-local-density');
+  let strategicMitigation = null;
+  if (val('arc-claim-atypical') === 'yes') strategicMitigation = { claimAtypical: true };
+  else if (densityVal && densityVal !== 'none') strategicMitigation = { localDensityRating: parseInt(densityVal, 10) };
+  const overrideRaw = val('arc-authority-override');
+
+  const air = {
+    atypical:       val('arc-atypical')    === 'yes',
+    aboveFL600:     val('arc-above-fl600') === 'yes',
+    airportEnv:     val('arc-airport-env') === 'yes',
+    classBCD:       val('arc-class-bcd')   === 'yes',
+    above150m:      val('arc-above-150')   === 'yes',
+    modeSVeilOrTMZ: val('arc-mode-s')      === 'yes',
+    controlled:     val('arc-controlled')  === 'yes',
+    urban:          val('arc-urban')       === 'yes',
+    authorityOverrideARC: (overrideRaw && overrideRaw !== 'none') ? overrideRaw : null,
+    strategicMitigation,
+  };
+
+  // "Low risk of encounter with manned aircraft" (STS, PDRA) is taken as a
+  // residual ARC of a or b from the operator's own Step #4–#5 answers.
+  let lowMannedAircraftRisk = true;
+  try {
+    const arc = window.computeAirRisk({ ...air, isVLOS: true, finalGRC: 1 }).residualARC;
+    lowMannedAircraftRisk = arc === 'a' || arc === 'b';
+  } catch (e) { /* keep the default */ }
+
+  const input = {
+    dimMeters: guard.dim, speedMs: guard.speed, massGrams, mtomGrams: massGrams,
+    uasClass: classRaw === 'other' ? 'private' : classRaw,
+    maxHeightM,
+    isVLOS:      los === 'VLOS',                  // strict VLOS, for the category
+    vlosForTMPR: val('arc-vlos') === 'vlos',      // VLOS / EVLOS, for Step #6
+    overAssemblies:   people === 'assemblies' || pop === 'assemblies',
+    overUninvolved:   people !== 'none',
+    dangerousGoods:   goods !== 'no',
+    crashProtected:   goods === 'protected',
+    transportsPeople: val('cat-transports-people') === 'yes',
+    dropsMaterial:    val('cat-drops-material') === 'yes',
+    controlledGround:  pop === 'controlled',
+    sparselyPopulated: val('cat-sparse') === 'yes',
+    hasAirspaceObservers: observers,
+    withinDLOS:           observers,
+    lowMannedAircraftRisk,
+    popQual:  pop || 'suburban',
+    popBelow: pop ? POP_BELOW[pop] : null,
+    mitigations: { m1a, m1b: radio('m1b') || 'none', m1c: radio('m1c') || 'none', m2: radio('m2') || 'none' },
+    shelteringApplicable:    m1a !== 'none',
+    adjShelteringApplicable: val('cont-shelter') === 'yes',
+    adjPopBand:   adjBand || null,
+    adjPopBelow:  adjBand ? ADJ_BELOW[adjBand] : null,
+    assemblyBand: asmBand || null,
+    largeAssemblyWithin1km: !!asmBand && asmBand !== 'under40k',
+    ...air,
+    // The interface always shows the assessment, also for Open and STS operations.
+    alwaysAssess: true,
+    // The category gate needs MTOM and maximum height; without them it is skipped.
+    skipCategory: massGrams === null || maxHeightM === null,
+  };
+  return { ok: true, input, los, tmprMode: val('arc-vlos') };
+};
+
+// Step #0 — runs the category check (category.js) and shows the result under
+// the category selector, compared with the category the operator selected.
+window.updateCategoryCheck = function() {
+  const box = document.getElementById('category-result');
+  if (!box) return null;
+  const esc  = window.escHtml;
+  const line = (html, colour) => `<div style="color:${colour || 'var(--text)'};">${html}</div>`;
+  const list = (items, colour) => (items || []).map(t => `<div style="color:${colour};padding-left:12px;">– ${esc(t)}</div>`).join('');
+
+  const g = window._gatherSoraInput();
+  if (!g.ok || g.input.skipCategory || typeof window.classifyOperation !== 'function') {
+    window.categoryCheck = null;
+    box.innerHTML = line('Enter UA dimension, max speed, MTOM and max altitude to run the category check.', 'var(--muted)');
+    return null;
+  }
+
+  let cat;
+  try { cat = window.classifyOperation(g.input); }
+  catch (e) {
+    window.categoryCheck = null;
+    box.innerHTML = line('Category check failed: ' + esc(e.message), 'var(--danger)');
+    return null;
+  }
+
+  let headline;
+  if (cat.category === 'Certified') {
+    headline = 'Certified category';
+  } else if (cat.category === 'Open') {
+    headline = 'Open category, subcategory ' + cat.subcategory;
+  } else {
+    const routes = [];
+    if (cat.sts01Eligible) routes.push('STS-01');
+    if (cat.sts02Eligible) routes.push('STS-02');
+    routes.push(...(cat.pdraEligible || []));
+    headline = 'Specific category' + (routes.length ? ' — within the scope of ' + routes.join(', ') : ' — full SORA');
+  }
+
+  // Does the operator's own selection agree with the check?
+  const selected = document.querySelector('input[name="cat"]:checked')?.value || null;
+  let consistent = null, reasons = [], toVerify = [], remark = null;
+  if (selected) {
+    if (cat.category === 'Certified') {
+      consistent = false; reasons = cat.certifiedTriggers;
+    } else if (['A1', 'A2', 'A3'].includes(selected)) {
+      if (cat.category !== 'Open') { consistent = false; reasons = cat.openFailures; }
+      else if (cat.subcategory !== selected) { consistent = false; reasons = ['The inputs place this operation in subcategory ' + cat.subcategory + '.']; }
+      else consistent = true;
+    } else if (cat.category === 'Open') {
+      consistent = true;
+      remark = 'The inputs also fit the Open category (' + cat.subcategory + '), where no declaration or authorisation is needed.';
+    } else if (selected === 'STS-01') {
+      consistent = !!cat.sts01Eligible; reasons = cat.sts01Failures;
+    } else if (selected === 'STS-02') {
+      consistent = !!cat.sts02Eligible; reasons = cat.sts02Failures;
+    } else if (selected.startsWith('PDRA-')) {
+      const p = cat.pdra && cat.pdra[selected];
+      consistent = !!(p && p.eligible);
+      reasons  = p ? p.failures : [];
+      toVerify = p ? p.toVerify : [];
+    } else {
+      consistent = true; // Specific / SORA is always available below the Certified category
+    }
+  }
+
+  let html = line('<strong>CATEGORY CHECK:</strong> ' + esc(headline), cat.category === 'Certified' ? 'var(--danger)' : 'var(--text)');
+  if (selected) {
+    html += consistent
+      ? line('Selected: ' + esc(selected) + ' — consistent with the inputs ✓', 'var(--ok)')
+      : line('⚠ Selected: ' + esc(selected) + ' — not supported by the inputs:', 'var(--warn)') + list(reasons, 'var(--warn)');
+    if (remark) html += line(esc(remark), 'var(--muted)');
+    if (toVerify.length) html += line('To verify yourself (not checked by MissionDesk):', 'var(--muted)') + list(toVerify, 'var(--muted)');
+  } else {
+    html += line('No category selected above.', 'var(--muted)');
+  }
+  if (cat.warnings && cat.warnings.length) html += list(cat.warnings, 'var(--warn)');
+  if ((g.los === 'VLOS' && g.tmprMode === 'bvlos') || (g.los === 'BVLOS' && g.tmprMode === 'vlos')) {
+    html += line('⚠ Flight regime here (' + esc(g.los) + ') differs from the operational mode chosen in Step 6.', 'var(--warn)');
+  }
+  html += line(esc(cat.nextStep), 'var(--muted)');
+  box.innerHTML = html;
+
+  window.categoryCheck = { headline, selected, consistent, nextStep: cat.nextStep, result: cat };
+  return cat;
+};
+
+// Shows how far the pipeline got and why it stopped, under the SAIL display.
+function _renderPipelineStatus(r) {
+  const el = document.getElementById('sora-pipeline-status');
+  if (!el) return;
+  const esc = window.escHtml;
+  const pendingContainment = !!(r.containment && r.containment.incomplete);
+  const state = [
+    ['Category',    r.category ? true : null],
+    ['Ground risk', r.groundRisk ? (!r.groundRisk.outOfScope && r.groundRisk.finalGRC <= 7) : null],
+    ['Air risk + SAIL', r.airRisk ? !r.airRisk.sailOutOfScope : null],
+    ['Containment', r.containment ? (pendingContainment ? null : !r.containment.outOfScope) : null],
+    ['OSOs',        r.oso ? true : null],
+  ];
+  const chip = ([name, ok]) => {
+    const colour = ok === true ? 'var(--ok)' : ok === false ? 'var(--danger)' : 'var(--muted)';
+    const mark   = ok === true ? '✓' : ok === false ? '✗' : '·';
+    return `<span style="color:${colour};margin-right:14px;white-space:nowrap;">${mark} ${name}</span>`;
+  };
+  let html = '<div>' + state.map(chip).join('') + '</div>';
+  if (r.completed && r.summary) {
+    html += `<div style="color:var(--ok);margin-top:4px;">${esc(r.summary.headline)}</div>`;
+    if (r.summary.nextStep) html += `<div style="color:var(--muted);">${esc(r.summary.nextStep)}</div>`;
+  } else if (pendingContainment) {
+    html += `<div style="color:var(--muted);margin-top:4px;">Step #8 pending — ${esc(r.containment.note)}</div>`;
+  } else {
+    (r.blockers || []).forEach(b => {
+      html += `<div style="color:var(--danger);margin-top:4px;">${esc(b.step)}: ${esc(b.reason)}</div>`;
+    });
+  }
+  el.innerHTML = html;
+}
+
+// Re-runs the pipeline without touching the SAIL display (used by Step #8).
+window._refreshPipelineStatus = function() {
+  const g = window._gatherSoraInput();
+  if (!g.ok || typeof window.runSORA !== 'function') { window.soraResult = null; return null; }
+  window.soraResult = window.runSORA(g.input);
+  _renderPipelineStatus(window.soraResult);
+  return window.soraResult;
+};
+
 window.calcSAIL25 = function() {
   window._sailCalculated = true;
   const warn = document.getElementById('stale-warn-sail'); if (warn) warn.style.display = 'none';
@@ -804,19 +1022,23 @@ window.calcSAIL25 = function() {
     if (!document.getElementById('igrc-dim').value) document.getElementById('igrc-dim').value = document.getElementById('drone-dim').value;
   }
 
-  // --- Compute iGRC and Final GRC via igrc.js ---
-  const grcResult = window.computeGroundRisk({
-    dimMeters:  dimVal,
-    speedMs:    speedVal,
-    massGrams:  massKg !== null ? massKg * 1000 : null,
-    popQual:    popEl ? popEl.value : 'suburban',
-    mitigations: {
-      m1a: document.querySelector('input[name="m1a"]:checked')?.value || 'none',
-      m1b: document.querySelector('input[name="m1b"]:checked')?.value || 'none',
-      m1c: document.querySelector('input[name="m1c"]:checked')?.value || 'none',
-      m2:  document.querySelector('input[name="m2"]:checked')?.value  || 'none',
-    },
-  });
+  // --- Run the SORA pipeline (sora.js): category → ground risk → air risk →
+  //     containment → OSOs. One call; each step's result is rendered below. ---
+  window.updateCategoryCheck();
+  const gathered = window._gatherSoraInput();
+  if (!gathered.ok) { _showSailCaution(gathered.message); return; }
+  const sora = window.runSORA(gathered.input);
+  window.soraResult = sora;
+  _renderPipelineStatus(sora);
+
+  if (!sora.groundRisk) {
+    // Stopped at the category gate (Certified category) or on an engine error.
+    _showSailCaution(sora.category && sora.category.category === 'Certified'
+      ? 'Certified category — SORA does not apply'
+      : 'Assessment stopped — see the status below');
+    return;
+  }
+  const grcResult = sora.groundRisk;
 
   if (grcResult.outOfScope) {
     document.getElementById('sail-num').textContent = 'Outside SORA scope';
@@ -842,29 +1064,9 @@ window.calcSAIL25 = function() {
     return;
   }
 
-  // --- Compute ARC, TMPR, and SAIL via arc.js ---
-  const densityVal = document.getElementById('arc-local-density')?.value;
-  const strategicMit = (() => {
-    if (document.getElementById('arc-claim-atypical')?.value === 'yes') return { claimAtypical: true };
-    if (densityVal && densityVal !== 'none') return { localDensityRating: parseInt(densityVal) };
-    return null;
-  })();
-
-  const overrideRaw = document.getElementById('arc-authority-override')?.value;
-  const airResult = window.computeAirRisk({
-    atypical:       document.getElementById('arc-atypical')?.value      === 'yes',
-    aboveFL600:     document.getElementById('arc-above-fl600')?.value   === 'yes',
-    airportEnv:     document.getElementById('arc-airport-env')?.value   === 'yes',
-    classBCD:       document.getElementById('arc-class-bcd')?.value     === 'yes',
-    above150m:      document.getElementById('arc-above-150')?.value     === 'yes',
-    modeSVeilOrTMZ: document.getElementById('arc-mode-s')?.value        === 'yes',
-    controlled:     document.getElementById('arc-controlled')?.value    === 'yes',
-    urban:          document.getElementById('arc-urban')?.value         === 'yes',
-    authorityOverrideARC: (overrideRaw && overrideRaw !== 'none') ? overrideRaw : null,
-    isVLOS:         document.getElementById('arc-vlos')?.value          === 'vlos',
-    strategicMitigation: strategicMit,
-    finalGRC,
-  });
+  // --- ARC, TMPR and SAIL from the pipeline (arc.js) ---
+  const airResult = sora.airRisk;
+  if (!airResult) { _showSailCaution('Assessment stopped — see the status below'); return; }
 
   const { residualARC, initialARC, aec, aecDescription, tmpr, tmprRobustness, tmprRiskRatio,
           vlosExempt, tmprNote, sail, sailRoman, sailOutOfScope, sailReason,
@@ -965,7 +1167,10 @@ window.assessContainment = function() {
     return;
   }
 
-  const r = window.computeContainment({
+  // Step #8 is read from the pipeline run; the direct call is the fallback for
+  // when the pipeline stopped before containment (e.g. no SAIL yet).
+  const pipeline = window._refreshPipelineStatus();
+  const r = (pipeline && pipeline.containment) || window.computeContainment({
     dimMeters:            dim,
     speedMs:              speed,
     massGrams:            massKg !== null ? massKg * 1000 : null,
@@ -1007,11 +1212,14 @@ window.renderOSO = function() {
     if (!el) return;
     el.innerHTML = '';
     items.forEach(oso => {
-      const sailIdx = window.sailOrder ? window.sailOrder.indexOf(filterSail) : 0;
-      const osoMinIdx = window.sailOrder ? window.sailOrder.indexOf(oso.minSail) : 0;
-      const dimmed = filterSail !== 'all' && sailIdx < osoMinIdx;
-      // Required robustness for the selected SAIL [AMC1 Article 11, Table 14]
-      const robCode  = (filterSail !== 'all' && oso.rob) ? oso.rob[sailIdx] : null;
+      const sailIdx = window.sailOrder ? window.sailOrder.indexOf(filterSail) : -1;
+      // Required robustness per SAIL comes from oso.js — AMC1 Article 11, Table 14.
+      const def     = (window.OSO_DEFINITIONS_MAIN_BODY || []).find(d => d.id === Number(oso.num));
+      const levels  = def ? def.sail : [];
+      const minIdx  = levels.findIndex(l => l !== 'NR');
+      const minSail = (minIdx >= 0 && window.sailOrder) ? window.sailOrder[minIdx] : '–';
+      const dimmed  = filterSail !== 'all' && levels[sailIdx] === 'NR';
+      const robCode = (filterSail !== 'all' && levels.length) ? levels[sailIdx] : null;
       const robLabel = robCode ? ({ NR: 'Not required', L: 'Low', M: 'Medium', H: 'High' }[robCode] || robCode) : null;
 
       const div = document.createElement('div');
@@ -1024,7 +1232,7 @@ window.renderOSO = function() {
         <div class="oso-text" style="width:100%;">
           <div>
             <span class="oso-num">OSO #${oso.num}</span>
-            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">Min SAIL ${oso.minSail}${robLabel ? ' · Robustness at SAIL ' + filterSail + ': ' + robLabel : ''}</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:8px;">Min SAIL ${minSail}${robLabel ? ' · Robustness at SAIL ' + filterSail + ': ' + robLabel : ''}</span>
             &nbsp;${oso.text}
           </div>
           <div class="oso-desc-box" style="display:none; margin-top:10px;">
@@ -3254,6 +3462,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.formatDateInput === 'function') window.formatDateInput(dateInput);
   }
 
+  // Step #0 — any change to the form may affect the category check.
+  let categoryTimer = null;
+  document.addEventListener('change', () => {
+    clearTimeout(categoryTimer);
+    categoryTimer = setTimeout(() => window.updateCategoryCheck(), 50);
+  });
+  // These inputs can stop or redirect the pipeline (Certified triggers, EVLOS,
+  // PDRA scope), so they re-run the whole assessment.
+  ['cat-dangerous-goods', 'cat-people', 'cat-observers', 'cat-transports-people', 'cat-drops-material',
+   'cat-sparse', 'op-los', 'op-alt', 'drone-class', 'drone-mtom'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => window.calcSAIL25());
+  });
+
   // GRC inputs — radio buttons
   document.querySelectorAll('input[name="pop"], input[name="m1a"], input[name="m1b"], input[name="m1c"], input[name="m2"]')
     .forEach(el => el.addEventListener('change', window.calcSAIL25));
@@ -3287,6 +3509,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(typeof window.handleOpTypeChange === 'function') window.handleOpTypeChange();
     if(typeof window.handleFlightTypeChange === 'function') window.handleFlightTypeChange();
     if(typeof window.calcSAIL25 === 'function') window.calcSAIL25();
+    if (typeof window.updateCategoryCheck === 'function') window.updateCategoryCheck();
     if (typeof window.renderInitialTemRows === 'function') window.renderInitialTemRows();
     if (typeof window.updateHeaderMissionName === 'function') window.updateHeaderMissionName(); // <--- ADD THIS
   }, 100);

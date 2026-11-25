@@ -253,6 +253,8 @@
             <option value="C2">C2 (&lt;4kg)</option>
             <option value="C3">C3 (&lt;25kg)</option>
             <option value="C4">C4 (&lt;25kg legacy)</option>
+            <option value="C5">C5 (STS-01)</option>
+            <option value="C6">C6 (STS-02)</option>
             <option value="other">Other / custom-built</option>
           </select>
         </div>
@@ -438,6 +440,65 @@
             <option value="natt">Night flight</option>
           </select>
         </div>
+      </div>
+
+      <div class="section-label">▸ A3b – CATEGORY CHECK (EU 2019/947, ARTICLES 4–6 · STS · PDRA)</div>
+      <div class="info-box">
+        MissionDesk checks the category you selected against what you have entered: UA class, dimension, speed, MTOM, max altitude,
+        flight regime, population density (Step 2), airspace (Step 4) and the answers below. The check is an aid — it does not replace your own assessment.
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>People overflown</label>
+          <select id="cat-people">
+            <option value="uninvolved">Uninvolved people may be overflown</option>
+            <option value="none">No uninvolved people overflown</option>
+            <option value="assemblies">Assemblies of people</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Dangerous goods carried</label>
+          <select id="cat-dangerous-goods">
+            <option value="no">No</option>
+            <option value="protected">Yes – in a crash-protected container</option>
+            <option value="unprotected">Yes – not crash-protected</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Material dropped during flight</label>
+          <select id="cat-drops-material">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label>Transport of people</label>
+          <select id="cat-transports-people">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>BVLOS: UA stays within detection line of sight</label>
+          <select id="cat-observers">
+            <option value="no">No</option>
+            <option value="yes">Yes – of the remote pilot or an airspace observer</option>
+          </select>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Used for STS-02 range and PDRA-G01</div>
+        </div>
+        <div class="field">
+          <label>Controlled ground area entirely in a sparsely populated area</label>
+          <select id="cat-sparse">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">Used for STS-02 only</div>
+        </div>
+      </div>
+      <div id="category-result" style="margin:4px 0 20px; padding:10px 14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface2); font-family:var(--mono); font-size:11px; line-height:1.7;">
+        <!-- Populated by updateCategoryCheck() -->
       </div>
 
       <div class="section-label">▸ A4 – OPERATIONS VOLUME & LOCATION</div>
@@ -989,6 +1050,9 @@
             <div class="risk-card" style="padding:10px 16px;"><div class="risk-card-label">FINAL GRC</div><div class="risk-card-value risk-med" id="grc-val" style="font-size:22px;">–</div></div>
             <div class="risk-card" style="padding:10px 16px;"><div class="risk-card-label">RESIDUAL ARC</div><div class="risk-card-value risk-med" id="arc-val" style="font-size:22px;">–</div></div>
           </div>
+        </div>
+        <div id="sora-pipeline-status" style="margin-top:10px; font-family:var(--mono); font-size:11px; line-height:1.7;">
+          <!-- Populated by calcSAIL25(): how far the SORA pipeline got, and why it stopped -->
         </div>
       </div>
 
@@ -1751,6 +1815,9 @@
 <script src="js/igrc.js"></script>
 <script src="js/arc.js"></script>
 <script src="js/containment.js"></script>
+<script src="js/category.js"></script>
+<script src="js/oso.js"></script>
+<script src="js/sora.js"></script>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script src="js/maps.js"></script>

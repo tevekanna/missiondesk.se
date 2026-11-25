@@ -135,39 +135,35 @@ window.EU_CLASS_MAP = {
   'C4': {maxMtom:25.0,  label:'C4 (<25kg legacy)'},
 };
 
-// Step #9 — Operational safety objectives.
-// Source: AMC1 Article 11 of Regulation (EU) 2019/947 (SORA 2.5), S.4.9.3,
-// Table 14 — AMC & GM Issue 1, Amendment 5 (ED Decision 2026/010/R).
-//   rob:     required robustness per SAIL I–VI ('NR' = not required to be
-//            shown to the competent authority, L = low, M = medium, H = high).
-//   minSail: first SAIL at which the objective is required (derived from rob).
-// OSO #04 follows the EASA table (NR NR NR M H H); the JARUS Main Body has
-// NR NR NR L M H.
+// Step #9 — Operational safety objectives: descriptive texts for the checklist.
+// The required robustness per SAIL is NOT stored here. It comes from oso.js
+// (AMC1 Article 11 of Regulation (EU) 2019/947, S.4.9.3, Table 14), which is
+// the single source for those values.
 window.osoData = {
   technical: [
-    { num: '01', minSail: 'II',  rob: ['NR','L','M','H','H','H'],   text: 'Operator is competent and/or proven. Checklist, maintenance plan, training programme, defined responsibilities. SAIL IV+: SMS in line with ICAO Annex 19.' },
-    { num: '02', minSail: 'III', rob: ['NR','NR','L','M','H','H'],  text: 'UAS manufactured by a competent and/or proven entity. Manufacturing procedures incl. material requirements, traceability, inspection, configuration control.' },
-    { num: '03', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'UAS maintained by a competent and/or proven entity. Maintenance instructions, log system, qualified personnel, release-to-service.' },
-    { num: '04', minSail: 'IV',  rob: ['NR','NR','NR','M','H','H'], text: 'Safety-critical UAS components designed to Airworthiness Design Standard (ADS) e.g. EASA SC-Light-UAS, STANAG 4703 or JARUS CS-LUAS.' },
-    { num: '05', minSail: 'III', rob: ['NR','NR','L','M','H','H'],  text: 'UAS designed with regard to system safety and reliability. Includes former OSO#10 (safe recovery from a technical issue). Failure mode analysis, redundancy, safe-state on failure.' },
-    { num: '06', minSail: 'II',  rob: ['NR','L','L','M','H','H'],   text: 'C3 link characteristics (performance, spectrum) are adequate for the operation. Range, latency, countermeasures against interference, link-loss procedure.' },
-    { num: '07', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'Configuration control of the UAS completed before each flight. Software version control, hardware inspections, sensor calibration.' },
-    { num: '08', minSail: 'I',   rob: ['L','M','H','H','H','H'],    text: 'Operational procedures defined, validated and followed. Normal operation, emergency procedures, contingency, pre/post-flight checklists.' },
-    { num: '09', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'Remote crew is trained and current. Pilot, observer and technicians hold relevant competency certificates, operations-specific training and current validation status.' },
+    { num: '01', text: 'Operator is competent and/or proven. Checklist, maintenance plan, training programme, defined responsibilities. SAIL IV+: SMS in line with ICAO Annex 19.' },
+    { num: '02', text: 'UAS manufactured by a competent and/or proven entity. Manufacturing procedures incl. material requirements, traceability, inspection, configuration control.' },
+    { num: '03', text: 'UAS maintained by a competent and/or proven entity. Maintenance instructions, log system, qualified personnel, release-to-service.' },
+    { num: '04', text: 'Safety-critical UAS components designed to Airworthiness Design Standard (ADS) e.g. EASA SC-Light-UAS, STANAG 4703 or JARUS CS-LUAS.' },
+    { num: '05', text: 'UAS designed with regard to system safety and reliability. Includes former OSO#10 (safe recovery from a technical issue). Failure mode analysis, redundancy, safe-state on failure.' },
+    { num: '06', text: 'C3 link characteristics (performance, spectrum) are adequate for the operation. Range, latency, countermeasures against interference, link-loss procedure.' },
+    { num: '07', text: 'Configuration control of the UAS completed before each flight. Software version control, hardware inspections, sensor calibration.' },
+    { num: '08', text: 'Operational procedures defined, validated and followed. Normal operation, emergency procedures, contingency, pre/post-flight checklists.' },
+    { num: '09', text: 'Remote crew is trained and current. Pilot, observer and technicians hold relevant competency certificates, operations-specific training and current validation status.' },
   ],
   org: [
-    { num: '13', minSail: 'I',   rob: ['L','L','M','H','H','H'],    text: 'External services supporting the UAS operation are adequate (e.g. weather data, UTM services, external power supply). Service Level Agreement (SLA) where applicable.' },
-    { num: '16', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'Multi-crew coordination (MCC). If more than one person is involved in flight operations: defined roles, communication procedures, CRM training.' },
-    { num: '17', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'Remote crew is fit to operate. Control of rest, health, and fitness for duty. Fitness-for-duty procedure.' },
+    { num: '13', text: 'External services supporting the UAS operation are adequate (e.g. weather data, UTM services, external power supply). Service Level Agreement (SLA) where applicable.' },
+    { num: '16', text: 'Multi-crew coordination (MCC). If more than one person is involved in flight operations: defined roles, communication procedures, CRM training.' },
+    { num: '17', text: 'Remote crew is fit to operate. Control of rest, health, and fitness for duty. Fitness-for-duty procedure.' },
   ],
   human: [
-    { num: '18', minSail: 'III', rob: ['NR','NR','L','M','H','H'],  text: 'Automatic flight envelope protection against human error (e.g. max altitude, geofencing, attitude restriction). Active system preventing exceedance.' },
-    { num: '19', minSail: 'III', rob: ['NR','NR','L','M','M','H'],  text: 'Safe recovery from human errors. Procedures and/or automation enabling the operator to correct an error without catastrophe (e.g. RTL, hover mode).' },
-    { num: '20', minSail: 'II',  rob: ['NR','L','L','M','M','H'],   text: 'Human Factors evaluation completed and HMI (Human-Machine Interface) evaluated as appropriate for the mission. Workload, alerts, display layout.' },
+    { num: '18', text: 'Automatic flight envelope protection against human error (e.g. max altitude, geofencing, attitude restriction). Active system preventing exceedance.' },
+    { num: '19', text: 'Safe recovery from human errors. Procedures and/or automation enabling the operator to correct an error without catastrophe (e.g. RTL, hover mode).' },
+    { num: '20', text: 'Human Factors evaluation completed and HMI (Human-Machine Interface) evaluated as appropriate for the mission. Workload, alerts, display layout.' },
   ],
   environment: [
-    { num: '23', minSail: 'I',   rob: ['L','L','M','M','H','H'],    text: 'Environmental conditions for safe operation defined, measurable and followed. Max wind, temperature, humidity, visibility, precipitation limits documented and enforced.' },
-    { num: '24', minSail: 'III', rob: ['NR','NR','M','H','H','H'],  text: 'UAS designed and qualified for adverse environmental conditions (e.g. adequate sensors, DO-160 qualification for temperature, vibration, humidity, EMC).' },
+    { num: '23', text: 'Environmental conditions for safe operation defined, measurable and followed. Max wind, temperature, humidity, visibility, precipitation limits documented and enforced.' },
+    { num: '24', text: 'UAS designed and qualified for adverse environmental conditions (e.g. adequate sensors, DO-160 qualification for temperature, vibration, humidity, EMC).' },
   ],
 };
 

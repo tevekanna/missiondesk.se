@@ -17,6 +17,18 @@
 //   3. Containment       (containment.js) — Step #8:  Adjacent area
 //   4. OSOs              (oso.js)      — Step #9:  Robustness requirements
 //
+// Options:
+//   alwaysAssess  — continue with Steps #2–#9 even when the operation is in the
+//                   Open category or qualifies for an STS declaration. The
+//                   category result is still returned. Used by the user
+//                   interface, where operators may want the assessment anyway.
+//   skipCategory  — do not run the category gate (inputs for it are missing).
+//   vlosForTMPR   — VLOS / EVLOS flag for Step #6 when it differs from the
+//                   strict VLOS flag used for the category (EVLOS is not VLOS
+//                   for the Open category, but needs no TMPR).
+//   adjPopBand, assemblyBand — Step #8 selector values, used when no measured
+//                   adjPopDensity / assemblySize is given.
+//
 // Abort-on-error semantics:
 //   If any step produces an out-of-scope or Certified result the pipeline
 //   stops immediately and returns with `completed: false` and a `blockers`
@@ -97,6 +109,8 @@
       hasAirspaceObservers:  false,
       lowMannedAircraftRisk: true,
       useEAROSOs:            false,
+      alwaysAssess:          false,
+      skipCategory:          false,
       mitigations:           {},
       ...input,
     };
@@ -104,16 +118,18 @@
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 0 — Category classification
     // ═══════════════════════════════════════════════════════════════════════
-    let categoryResult;
-    try {
-      categoryResult = classifyOperation(p);
-    } catch (err) {
-      blockers.push(makeBlocker('category', `Unexpected error: ${err.message}`));
-      return _buildResult({ input: p, completed: false, blockers, step: 'category' });
+    let categoryResult = null;
+    if (!p.skipCategory) {
+      try {
+        categoryResult = classifyOperation(p);
+      } catch (err) {
+        blockers.push(makeBlocker('category', `Unexpected error: ${err.message}`));
+        return _buildResult({ input: p, completed: false, blockers, step: 'category' });
+      }
     }
 
-    // Certified → hard stop
-    if (categoryResult.category === 'Certified') {
+    // Certified → hard stop (never bypassed by alwaysAssess)
+    if (categoryResult && categoryResult.category === 'Certified') {
       blockers.push(makeBlocker('category',
         'Operation is in the Certified category. SORA does not apply. ' +
         (categoryResult.certifiedTriggers || []).join(' | ')
@@ -125,7 +141,7 @@
     }
 
     // Open → pipeline complete after step 0 (no SORA needed)
-    if (categoryResult.category === 'Open') {
+    if (categoryResult && !p.alwaysAssess && categoryResult.category === 'Open') {
       return _buildResult({
         input: p, completed: true, blockers, step: 'category',
         categoryResult,
@@ -134,7 +150,7 @@
     }
 
     // Specific, STS eligible → pipeline complete after step 0
-    if (categoryResult.sts01Eligible || categoryResult.sts02Eligible) {
+    if (categoryResult && !p.alwaysAssess && (categoryResult.sts01Eligible || categoryResult.sts02Eligible)) {
       const stsType = categoryResult.sts01Eligible ? 'STS-01' : 'STS-02';
       return _buildResult({
         input: p, completed: true, blockers, step: 'sts',
@@ -200,7 +216,7 @@
         urban:                p.urban,
         authorityOverrideARC: p.authorityOverrideARC,
         strategicMitigation:  p.strategicMitigation,
-        isVLOS:               p.isVLOS,
+        isVLOS:               p.vlosForTMPR ?? p.isVLOS,
         finalGRC:             groundResult.finalGRC,
       });
     } catch (err) {
@@ -227,11 +243,11 @@
         dimMeters:            p.dimMeters,
         speedMs:              p.speedMs,
         massGrams:            p.massGrams,
-        shelteringApplicable: p.shelteringApplicable,
+        shelteringApplicable: p.adjShelteringApplicable ?? p.shelteringApplicable,
         sail:                 airResult.sail,
         // No default: an unknown adjacent ground area must not be treated as empty.
-        adjPopDensity:        p.adjPopDensity  ?? null,
-        assemblySize:         p.assemblySize   ?? null,
+        adjPopDensity:        p.adjPopDensity  ?? p.adjPopBand   ?? null,
+        assemblySize:         p.assemblySize   ?? p.assemblyBand ?? null,
       });
     } catch (err) {
       blockers.push(makeBlocker('containment', err.message));
@@ -272,8 +288,13 @@
     // ═══════════════════════════════════════════════════════════════════════
     const summary = _soraSummary({ groundResult, airResult, containmentResult, osoResult });
     // PDRA-S01 / G01 / G02 (October 2026 editions) — see category.js, Section 3b.
-    summary.pdraEligible = categoryResult.pdraEligible || [];
-    if (summary.pdraEligible.length > 0) summary.nextStep = categoryResult.nextStep;
+    summary.pdraEligible = (categoryResult && categoryResult.pdraEligible) || [];
+    // When the category gate was bypassed (alwaysAssess) or found a PDRA, its
+    // next step is the one that applies; otherwise the full-SORA next step stands.
+    if (categoryResult && (categoryResult.category === 'Open' || categoryResult.sts01Eligible ||
+        categoryResult.sts02Eligible || summary.pdraEligible.length > 0)) {
+      summary.nextStep = categoryResult.nextStep;
+    }
 
     return _buildResult({
       input: p,

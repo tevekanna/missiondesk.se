@@ -6,7 +6,7 @@
 // Update this file when releasing a new version.
 // This is read by both the Tauri desktop build and the GitHub Pages web version.
 // ==========================================
-window.MISSIONDESK_VERSION = '3.3.0';
+window.MISSIONDESK_VERSION = '3.4.0';
 
 // Where the "SOURCE · AGPL-3.0" link in the header points. MissionDesk is licensed
 // under AGPL-3.0-only: if you run a modified version and let others use it over a

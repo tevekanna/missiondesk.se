@@ -374,6 +374,8 @@
    * @param {number}  [p.popDensity]              - Max population density in operational volume + ground risk buffer
    * @param {boolean} [p.shelteringApplicable]    - M1(A) low: vast majority of people sheltered
    * @param {number}  [p.adjPopDensity]           - Average population density of the adjacent ground area
+   * @param {number}  [p.popBelow]                - Declared upper bound instead of a measured popDensity (e.g. 50 = "below 50")
+   * @param {number}  [p.adjPopBelow]             - Declared upper bound instead of a measured adjPopDensity
    * @param {boolean} [p.adjShelteringApplicable] - Sheltering applicable in the adjacent ground area (defaults to shelteringApplicable)
    * @param {boolean} [p.largeAssemblyWithin1km]  - Outdoor assembly of more than 40 000 people within 1 km
    * @param {boolean} [p.controlled]              - Controlled airspace
@@ -393,6 +395,21 @@
       maxHeightM = null, dangerousGoods = false,
     } = p;
     const adjSheltering = p.adjShelteringApplicable === undefined ? shelteringApplicable : p.adjShelteringApplicable;
+    const popBelow    = (p.popBelow    === undefined || p.popBelow    === null) ? null : p.popBelow;
+    const adjPopBelow = (p.adjPopBelow === undefined || p.adjPopBelow === null) ? null : p.adjPopBelow;
+
+    // A density is either measured (must be BELOW the limit) or declared as a band
+    // "below X" (X must not exceed the limit). Returns { fail, text } or { unknown }.
+    function densityCheck(measured, below, limit) {
+      if (measured !== null) {
+        return measured >= limit ? { fail: true, text: `${measured} people/km² is` } : { fail: false };
+      }
+      if (below !== null) {
+        const band = below === Infinity ? 'the selected band (no upper limit) is' : `the selected band (below ${below} people/km²) is`;
+        return below > limit ? { fail: true, text: band } : { fail: false };
+      }
+      return { unknown: true };
+    }
 
     const out = {};
     for (const id of Object.keys(PDRA_DEFINITIONS)) {
@@ -422,8 +439,9 @@
     if (!controlledGround) {
       s01.failures.push('PDRA-S01 requires a controlled ground area. [AMC4 Article 11, point (a)(3)]');
     }
-    if (adjPopDensity !== null && adjPopDensity >= 500) {
-      s01.failures.push(`Adjacent area average population density ${adjPopDensity} people/km² is not below 500. [AMC4 Article 11, point (a)(3)]`);
+    const s01Adj = densityCheck(adjPopDensity, adjPopBelow, 500);
+    if (s01Adj.fail) {
+      s01.failures.push(`Adjacent area average population density: ${s01Adj.text} not below 500. [AMC4 Article 11, point (a)(3)]`);
     }
     if (!atypical) {
       if (!lowMannedAircraftRisk) {
@@ -436,7 +454,7 @@
     if (maxHeightM !== null && maxHeightM > 120 && maxHeightM <= 150) {
       s01.toVerify.push('Unless additional justification is provided, the flight geography should be set at no more than 120 m AGL. [AMC4 Article 11, footnote to point (a)(6)]');
     }
-    if (adjPopDensity === null) {
+    if (s01Adj.unknown) {
       s01.toVerify.push('Adjacent area average population density must be below 500 people/km². [AMC4 Article 11, point (a)(3)]');
     }
     s01.toVerify.push('Remote pilot holds an STS theoretical certificate and an STS-01 practical accreditation. [AMC4 Article 11, point (a)(5)]');
@@ -457,18 +475,16 @@
     const basis = lightAndSheltered
       ? 'MTOM ≤ 25 kg with sheltering (M1(A) low)'
       : 'MTOM > 25 kg or sheltering not applicable';
-    if (popDensity !== null) {
-      if (popDensity >= popLimit) {
-        groundFailures.push(`Population density ${popDensity} people/km² in the operational volume and ground risk buffer is not below ${popLimit} (${basis}). [point (a)(5)(i) / (a)(6)(i)]`);
-      }
-    } else {
+    const gPop = densityCheck(popDensity, popBelow, popLimit);
+    if (gPop.fail) {
+      groundFailures.push(`Population density in the operational volume and ground risk buffer: ${gPop.text} not below ${popLimit} (${basis}). [point (a)(5)(i) / (a)(6)(i)]`);
+    } else if (gPop.unknown) {
       groundToVerify.push(`Maximum population density in the operational volume and ground risk buffer must be below ${popLimit} people/km² (${basis}). [point (a)(5)(i) / (a)(6)(i)]`);
     }
-    if (adjPopDensity !== null) {
-      if (adjPopDensity >= adjLimit) {
-        groundFailures.push(`Adjacent area average population density ${adjPopDensity} people/km² is not below ${adjLimit}. [point (a)(5)(ii) / (a)(6)(ii)]`);
-      }
-    } else {
+    const gAdj = densityCheck(adjPopDensity, adjPopBelow, adjLimit);
+    if (gAdj.fail) {
+      groundFailures.push(`Adjacent area average population density: ${gAdj.text} not below ${adjLimit}. [point (a)(5)(ii) / (a)(6)(ii)]`);
+    } else if (gAdj.unknown) {
       groundToVerify.push(`Adjacent area average population density must be below ${adjLimit} people/km². [point (a)(5)(ii) / (a)(6)(ii)]`);
     }
     if (mtomGrams === null) {
